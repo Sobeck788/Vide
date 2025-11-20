@@ -17,6 +17,8 @@
                 </div>
             </div>
             <div class="location-user-section">
+                <div class="user-location"><span id="currentLocation">Oaxaca</span></div>
+                
                 <div class="user-menu" id="userMenuContainer" style="display: none;">
                     <button class="user-button" id="userMenuButton">
                         <div class="user-authenticated">
@@ -38,14 +40,12 @@
 
         <main class="video-player-container">
             <div class="player-section">
-                <div class="video-player" id="videoPlayer"></div>
+                <div class="video-player" id="videoPlayer"><div class="loading-player">Cargando...</div></div>
                 <div class="video-info-detailed">
-                    <h1 class="video-title-detailed" id="videoTitle">Cargando...</h1>
+                    <h1 class="video-title-detailed" id="videoTitle">...</h1>
                     <div class="channel-info">
-                        <div class="channel-details">
-                            <div class="channel-name" id="channelName"></div>
-                        </div>
-                        <button class="subscribe-btn" onclick="alert('Suscrito!')">Suscribirse</button>
+                        <div class="channel-details"><div class="channel-name" id="channelName"></div></div>
+                        <button class="subscribe-btn" onclick="alert('¡Suscrito!')">Suscribirse</button>
                     </div>
                     <div class="video-description-detailed" id="videoDescription"></div>
                 </div>
@@ -63,7 +63,6 @@
         var firstScriptTag = document.getElementsByTagName('script')[0];
         firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
     </script>
-
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
@@ -100,44 +99,44 @@
         }
         function cerrarSesion() { auth.signOut().then(() => window.location.reload()); }
 
-        let player, currentVideoInfo;
+        let player, currentVideoInfo, currentLocation = 'Oaxaca';
+
         function onYouTubeIframeAPIReady() {
             const params = new URLSearchParams(window.location.search);
             const id = params.get('v');
+            
+            // RECUPERAR UBICACIÓN
+            if (params.get('location')) currentLocation = params.get('location');
+            document.getElementById('currentLocation').textContent = currentLocation;
+            
             if(id) {
-                cargarVideo(id);
-                cargarSugerencias();
+                cargarReproductor(id);
+                obtenerInfoYGuardar(id);
+                cargarSugerencias(currentLocation);
             }
         }
 
-        function cargarVideo(id) {
-            if(player) player.loadVideoById(id);
-            else player = new YT.Player('videoPlayer', { height: '500', width: '100%', videoId: id, events: { 'onStateChange': onPlayerStateChange } });
-            obtenerInfo(id);
-        }
-
-        function onPlayerStateChange(event) {
-            // Solo guardamos si está reproduciendo Y tenemos info válida
-            if (event.data === YT.PlayerState.PLAYING && currentVideoInfo) {
-                guardarEnHistorial(currentVideoInfo);
+        function cargarReproductor(id) {
+            if (id.startsWith('vid_') || id.startsWith('demo_')) {
+                document.getElementById('videoPlayer').innerHTML = `<div style="color:white; height:100%; display:flex; justify-content:center; align-items:center; background:black;">Video Demo</div>`;
+            } else {
+                player = new YT.Player('videoPlayer', { height: '500', width: '100%', videoId: id, playerVars: { 'autoplay': 1 } });
             }
         }
 
-        async function obtenerInfo(id) {
+        async function obtenerInfoYGuardar(id) {
             try {
                 const res = await fetch(`/api/video-info?v=${id}`);
-                if(!res.ok) throw new Error('Err');
                 const data = await res.json();
-                if(data.success) {
+                if (data.success) {
                     currentVideoInfo = data.video;
-                    document.getElementById('videoTitle').textContent = data.video.title;
-                    document.getElementById('channelName').textContent = data.video.channelTitle;
-                    document.getElementById('videoDescription').textContent = data.video.description;
-                }
+                    mostrarDetalles(data.video);
+                    guardarEnHistorial(data.video); 
+                } else { throw new Error("No data"); }
             } catch(e) {
-                // Fallback
-                currentVideoInfo = { id: id, title: "Video de YouTube", channelTitle: "Desconocido", thumbnail: `https://i.ytimg.com/vi/${id}/mqdefault.jpg` };
-                document.getElementById('videoTitle').textContent = "Video de YouTube (Sin Info)";
+                const demo = { id: id, title: "Video Demo / No Info", channelTitle: "Demo", description: "Error al cargar datos.", thumbnail: `https://picsum.photos/seed/${id}/300/200` };
+                mostrarDetalles(demo);
+                guardarEnHistorial(demo);
             }
         }
 
@@ -149,13 +148,19 @@
             }, { merge: true });
         }
 
-        async function cargarSugerencias() {
+        function mostrarDetalles(v) {
+            document.getElementById('videoTitle').textContent = v.title;
+            document.getElementById('channelName').textContent = v.channelTitle;
+            document.getElementById('videoDescription').textContent = v.description;
+        }
+
+        async function cargarSugerencias(loc) {
             try {
-                const res = await fetch(`/api/videos?location=Oaxaca`);
+                const res = await fetch(`/api/videos?location=${loc}`);
                 const data = await res.json();
                 if(data.videos) {
                     document.getElementById('suggestionsList').innerHTML = data.videos.map(v => `
-                        <div class="suggestion-item" onclick="window.location.href='/reproduccion?v=${v.id}'">
+                        <div class="suggestion-item" onclick="window.location.href='/reproduccion?v=${v.id}&location=${loc}'">
                             <div class="suggestion-thumbnail" style="background-image: url('${v.thumbnail}')"></div>
                             <div class="suggestion-info"><div>${v.title}</div></div>
                         </div>`).join('');
@@ -163,7 +168,10 @@
             } catch(e) {}
         }
 
-        function buscarVideos() { window.location.href = `/?search=${document.getElementById('searchInput').value}`; }
+        function buscarVideos() { 
+            // BÚSQUEDA MANTIENE LA UBICACIÓN
+            window.location.href = `/?search=${document.getElementById('searchInput').value}&location=${currentLocation}`; 
+        }
         
         document.getElementById('userMenuButton').addEventListener('click', (e) => { e.stopPropagation(); document.getElementById('dropdownMenu').classList.toggle('show'); });
         window.addEventListener('click', () => document.getElementById('dropdownMenu').classList.remove('show'));
