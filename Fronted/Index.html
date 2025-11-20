@@ -23,6 +23,7 @@
                     <button onclick="cambiarUbicacion()" class="location-change-btn" style="font-size: 0.8em; padding: 2px 5px;">Cambiar</button>
                 </div>
                 
+                <!-- MENÚ USUARIO (Sin Foto/Contraseña) -->
                 <div class="user-menu" id="userMenuContainer" style="display: none;">
                     <button class="user-button" id="userMenuButton">
                         <div class="user-authenticated">
@@ -36,6 +37,8 @@
                         <button class="dropdown-item" onclick="cerrarSesion()">Salir</button>
                     </div>
                 </div>
+                
+                <!-- LOGIN (Visible por defecto) -->
                 <div id="loginContainer" style="display: block;">
                     <button class="login-button" onclick="iniciarSesionGoogle()">Iniciar Sesión</button>
                 </div>
@@ -43,7 +46,16 @@
         </header>
 
         <section class="filters">
-            <div class="location-info" id="locationInfo">Cargando...</div>
+            <div class="sort-filter">
+                <select id="sortSelect">
+                    <option value="relevance">Relevancia</option>
+                    <option value="date">Fecha</option>
+                    <option value="viewCount">Vistas</option>
+                </select>
+            </div>
+            <div class="location-info" id="locationInfo">
+                Cargando videos...
+            </div>
         </section>
 
         <section class="video-list" id="videoList">
@@ -65,6 +77,7 @@
           appId: "1:587797165631:web:3d9f16e83cf57497d46a8a",
           measurementId: "G-H837KE6W6K"
         };
+
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
@@ -92,71 +105,52 @@
 
         function guardarUsuarioEnDB(user) {
             db.collection('usuarios').doc(user.uid).set({
-                uid: user.uid, nombre: user.displayName, email: user.email, foto: user.photoURL,
+                uid: user.uid,
+                nombre: user.displayName,
+                email: user.email,
+                foto: user.photoURL,
                 ultimo_acceso: firebase.firestore.FieldValue.serverTimestamp()
             }, { merge: true });
         }
-        function cerrarSesion() { if(confirm('¿Salir?')) auth.signOut().then(() => window.location.reload()); }
 
-        // LÓGICA DE NAVEGACIÓN Y VIDEOS
-        let currentLocation = 'Oaxaca'; // Valor por defecto
+        function cerrarSesion() {
+            if (confirm('¿Salir?')) auth.signOut().then(() => window.location.reload());
+        }
 
+        // Lógica Videos
+        let currentLocation = 'Oaxaca';
         document.addEventListener('DOMContentLoaded', () => {
             const urlParams = new URLSearchParams(window.location.search);
+            if(urlParams.get('search')) document.getElementById('searchInput').value = urlParams.get('search');
+            cargarVideos(urlParams.get('search') || '');
             
-            // 1. RECUPERAR UBICACIÓN DE LA URL (IMPORTANTE)
-            if (urlParams.get('location')) {
-                currentLocation = urlParams.get('location');
-            }
-            document.getElementById('currentLocation').textContent = currentLocation;
-
-            // 2. RECUPERAR BÚSQUEDA
-            const searchParam = urlParams.get('search') || '';
-            if (searchParam) document.getElementById('searchInput').value = searchParam;
-            
-            cargarVideos(searchParam);
-
-            document.getElementById('searchInput').addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') buscarVideos();
-            });
-
-            // Menú Dropdown
             document.getElementById('userMenuButton').addEventListener('click', (e) => {
-                e.stopPropagation(); document.getElementById('dropdownMenu').classList.toggle('show');
+                e.stopPropagation();
+                document.getElementById('dropdownMenu').classList.toggle('show');
             });
             window.addEventListener('click', () => document.getElementById('dropdownMenu').classList.remove('show'));
         });
 
         async function cargarVideos(query) {
-            const videoList = document.getElementById('videoList');
-            videoList.innerHTML = '<div class="loading">Cargando...</div>';
-            document.getElementById('locationInfo').textContent = `Buscando "${query || 'vlogs'}" en ${currentLocation}...`;
-
             try {
                 const res = await fetch(`/api/videos?location=${currentLocation}&search=${encodeURIComponent(query)}`);
-                if(!res.ok) throw new Error('Error Backend');
+                if(!res.ok) throw new Error('Backend Error');
                 const data = await res.json();
-                
-                if(data.videos && data.videos.length > 0) {
-                    mostrarVideos(data.videos);
-                    document.getElementById('locationInfo').textContent = `Resultados para "${query || 'Tendencias'}" en ${currentLocation}`;
-                } else {
-                    throw new Error('Sin resultados');
-                }
+                if(data.videos) mostrarVideos(data.videos);
             } catch (e) {
-                // MOCK DATA (Failsafe)
+                // Demo Data
                 const mock = Array.from({length: 6}, (_,i) => ({
-                    id: `vid_${i}`, title: `Video Demo ${currentLocation} ${i}`, thumbnail: `https://picsum.photos/300/200?r=${i}`, channelTitle: 'Demo'
+                    id: `vid_${i}`, title: `Demo Video ${i}`, thumbnail: `https://picsum.photos/300/200?r=${i}`, channelTitle: 'Demo Channel', publishedAt: new Date()
                 }));
                 mostrarVideos(mock);
-                document.getElementById('locationInfo').textContent = `Modo Demo: ${currentLocation}`;
+                document.getElementById('locationInfo').innerHTML = 'Modo Demo (Configura API Key en Render)';
             }
         }
 
         function mostrarVideos(videos) {
             document.getElementById('videoList').innerHTML = videos.map(v => `
                 <div class="video-item">
-                    <div class="video-thumbnail" style="background-image: url('${v.thumbnail}')" onclick="reproducirVideo('${v.id}')">
+                    <div class="video-thumbnail" style="background-image: url('${v.thumbnail}')" onclick="window.location.href='/reproduccion?v=${v.id}'">
                         <div class="play-overlay">▶</div>
                     </div>
                     <div class="video-info">
@@ -164,27 +158,15 @@
                         <div class="video-channel">${v.channelTitle}</div>
                     </div>
                 </div>`).join('');
-        }
-
-        // 3. ARREGLO: MANTENER UBICACIÓN AL NAVEGAR
-        function reproducirVideo(videoId) {
-            window.location.href = `/reproduccion?v=${videoId}&location=${currentLocation}`;
+            document.getElementById('locationInfo').textContent = `Videos en ${currentLocation}`;
         }
 
         function buscarVideos() {
-            const search = document.getElementById('searchInput').value.trim();
-            // AQUÍ ESTÁ LA CLAVE: Pasamos también la ubicación
-            window.location.href = `/?search=${encodeURIComponent(search)}&location=${currentLocation}`;
+            window.location.href = `/?search=${document.getElementById('searchInput').value}`;
         }
-
         function cambiarUbicacion() {
-            const nueva = prompt('Nueva ubicación (ej: Japon, España, Puebla):', currentLocation);
-            if(nueva) {
-                currentLocation = nueva;
-                document.getElementById('currentLocation').textContent = currentLocation;
-                // Al cambiar ubicación, limpiamos la búsqueda para ver videos generales de ese lugar
-                window.location.href = `/?location=${nueva}`; 
-            }
+            const n = prompt('Nueva ubicación:', currentLocation);
+            if(n) { currentLocation = n; document.getElementById('currentLocation').textContent = n; cargarVideos(''); }
         }
     </script>
 </body>
