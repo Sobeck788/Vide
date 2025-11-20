@@ -3,18 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reproduciendo - VideITO</title>
+    <title>Tu Historial - VideITO</title>
     <link rel="stylesheet" href="Stilos.css">
+    <style>
+        .page-title { padding: 20px; font-size: 24px; color: #333; }
+        .no-data { padding: 40px; text-align: center; color: #666; font-size: 1.2em; }
+    </style>
 </head>
 <body>
     <div class="container">
         <header class="header">
             <div class="logo-section">
                 <a href="/" class="logo">VideITO</a>
-                <div class="search-bar">
-                    <input type="text" id="searchInput" placeholder="Buscar videos...">
-                    <button class="search-button" onclick="buscarVideos()">Buscar</button>
-                </div>
             </div>
             <div class="location-user-section">
                 <div class="user-menu" id="userMenuContainer" style="display: none;">
@@ -25,7 +25,7 @@
                         </div>
                     </button>
                     <div class="dropdown-menu" id="dropdownMenu">
-                        <a href="/historial" class="dropdown-item">Historial</a>
+                        <a href="/" class="dropdown-item">Inicio</a>
                         <div class="dropdown-divider"></div>
                         <button class="dropdown-item" onclick="cerrarSesion()">Salir</button>
                     </div>
@@ -36,33 +36,13 @@
             </div>
         </header>
 
-        <main class="video-player-container">
-            <div class="player-section">
-                <div class="video-player" id="videoPlayer"></div>
-                <div class="video-info-detailed">
-                    <h1 class="video-title-detailed" id="videoTitle">Cargando...</h1>
-                    <div class="channel-info">
-                        <div class="channel-details">
-                            <div class="channel-name" id="channelName"></div>
-                        </div>
-                        <button class="subscribe-btn" onclick="alert('Suscrito!')">Suscribirse</button>
-                    </div>
-                    <div class="video-description-detailed" id="videoDescription"></div>
-                </div>
-            </div>
-            <div class="suggestions-section">
-                <h3 class="suggestions-title">Sugerencias</h3>
-                <div class="suggestions-list" id="suggestionsList"></div>
-            </div>
+        <main>
+            <h1 class="page-title">Historial de Reproducción</h1>
+            <section class="video-list" id="historialContainer">
+                <div class="loading">Cargando...</div>
+            </section>
         </main>
     </div>
-
-    <script>
-        var tag = document.createElement('script');
-        tag.src = "https://www.youtube.com/iframe_api";
-        var firstScriptTag = document.getElementsByTagName('script')[0];
-        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-    </script>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
@@ -88,9 +68,11 @@
                 document.getElementById('loginContainer').style.display = 'none';
                 document.getElementById('userName').textContent = user.displayName;
                 document.getElementById('userAvatarHeader').style.backgroundImage = `url(${user.photoURL})`;
+                cargarHistorial(user.uid);
             } else {
                 document.getElementById('userMenuContainer').style.display = 'none';
                 document.getElementById('loginContainer').style.display = 'block';
+                document.getElementById('historialContainer').innerHTML = '<div class="no-data">Inicia sesión para ver tu historial.</div>';
             }
         });
 
@@ -98,75 +80,27 @@
             const provider = new firebase.auth.GoogleAuthProvider();
             auth.signInWithPopup(provider).catch(e => alert(e.message));
         }
-        function cerrarSesion() { auth.signOut().then(() => window.location.reload()); }
+        function cerrarSesion() { auth.signOut().then(() => window.location.href = '/'); }
 
-        let player, currentVideoInfo;
-        function onYouTubeIframeAPIReady() {
-            const params = new URLSearchParams(window.location.search);
-            const id = params.get('v');
-            if(id) {
-                cargarVideo(id);
-                cargarSugerencias();
-            }
-        }
-
-        function cargarVideo(id) {
-            if(player) player.loadVideoById(id);
-            else player = new YT.Player('videoPlayer', { height: '500', width: '100%', videoId: id, events: { 'onStateChange': onPlayerStateChange } });
-            obtenerInfo(id);
-        }
-
-        function onPlayerStateChange(event) {
-            // Solo guardamos si está reproduciendo Y tenemos info válida
-            if (event.data === YT.PlayerState.PLAYING && currentVideoInfo) {
-                guardarEnHistorial(currentVideoInfo);
-            }
-        }
-
-        async function obtenerInfo(id) {
+        async function cargarHistorial(uid) {
+            const container = document.getElementById('historialContainer');
             try {
-                const res = await fetch(`/api/video-info?v=${id}`);
-                if(!res.ok) throw new Error('Err');
-                const data = await res.json();
-                if(data.success) {
-                    currentVideoInfo = data.video;
-                    document.getElementById('videoTitle').textContent = data.video.title;
-                    document.getElementById('channelName').textContent = data.video.channelTitle;
-                    document.getElementById('videoDescription').textContent = data.video.description;
-                }
-            } catch(e) {
-                // Fallback
-                currentVideoInfo = { id: id, title: "Video de YouTube", channelTitle: "Desconocido", thumbnail: `https://i.ytimg.com/vi/${id}/mqdefault.jpg` };
-                document.getElementById('videoTitle').textContent = "Video de YouTube (Sin Info)";
-            }
+                const snapshot = await db.collection('usuarios').doc(uid).collection('historial').orderBy('vistoPorUltimaVez', 'desc').get();
+                if (snapshot.empty) { container.innerHTML = '<div class="no-data">No hay historial.</div>'; return; }
+                
+                container.innerHTML = snapshot.docs.map(doc => {
+                    const v = doc.data();
+                    return `<div class="video-item" onclick="window.location.href='/reproduccion?v=${v.videoId}'">
+                        <div class="video-thumbnail" style="background-image: url('${v.thumbnail}')"><div class="play-overlay">▶</div></div>
+                        <div class="video-info"><div class="video-title">${v.title}</div><div class="video-channel">${v.channelTitle}</div></div>
+                    </div>`;
+                }).join('');
+            } catch (e) { container.innerHTML = '<div class="no-data">Error al cargar.</div>'; }
         }
 
-        async function guardarEnHistorial(info) {
-            const user = auth.currentUser;
-            if(!user) return;
-            await db.collection('usuarios').doc(user.uid).collection('historial').doc(info.id).set({
-                videoId: info.id, title: info.title, channelTitle: info.channelTitle, thumbnail: info.thumbnail, vistoPorUltimaVez: firebase.firestore.FieldValue.serverTimestamp()
-            }, { merge: true });
-        }
-
-        async function cargarSugerencias() {
-            try {
-                const res = await fetch(`/api/videos?location=Oaxaca`);
-                const data = await res.json();
-                if(data.videos) {
-                    document.getElementById('suggestionsList').innerHTML = data.videos.map(v => `
-                        <div class="suggestion-item" onclick="window.location.href='/reproduccion?v=${v.id}'">
-                            <div class="suggestion-thumbnail" style="background-image: url('${v.thumbnail}')"></div>
-                            <div class="suggestion-info"><div>${v.title}</div></div>
-                        </div>`).join('');
-                }
-            } catch(e) {}
-        }
-
-        function buscarVideos() { window.location.href = `/?search=${document.getElementById('searchInput').value}`; }
-        
-        document.getElementById('userMenuButton').addEventListener('click', (e) => { e.stopPropagation(); document.getElementById('dropdownMenu').classList.toggle('show'); });
-        window.addEventListener('click', () => document.getElementById('dropdownMenu').classList.remove('show'));
+        const btn = document.getElementById('userMenuButton');
+        if(btn) btn.addEventListener('click', () => document.getElementById('dropdownMenu').classList.toggle('show'));
+        window.addEventListener('click', (e) => { if (!e.target.closest('.user-button')) document.getElementById('dropdownMenu').classList.remove('show'); });
     </script>
 </body>
 </html>
