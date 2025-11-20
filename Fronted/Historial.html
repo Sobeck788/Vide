@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VideITO - Historial</title>
+    <title>Reproduciendo - VideITO</title>
     <link rel="stylesheet" href="Stilos.css">
 </head>
 <body>
@@ -12,232 +12,161 @@
             <div class="logo-section">
                 <a href="/" class="logo">VideITO</a>
                 <div class="search-bar">
-                    <!-- Espacio reservado -->
+                    <input type="text" id="searchInput" placeholder="Buscar videos...">
+                    <button class="search-button" onclick="buscarVideos()">Buscar</button>
                 </div>
             </div>
-            
             <div class="location-user-section">
-                <div class="user-location" id="locationDisplay">
-                    Tu ubicación: <span id="currentLocation">Oaxaca de Juárez, Oaxaca</span>
-                </div>
-                
-                <div class="user-menu">
+                <div class="user-menu" id="userMenuContainer" style="display: none;">
                     <button class="user-button" id="userMenuButton">
                         <div class="user-authenticated">
-                            <div class="user-avatar"></div>
-                            <span id="userName">Usuario Ejemplo</span>
+                            <div class="user-avatar" id="userAvatarHeader"></div>
+                            <span id="userName">Usuario</span>
                         </div>
                     </button>
                     <div class="dropdown-menu" id="dropdownMenu">
-                        <a href="/perfil" class="dropdown-item">Mi Perfil</a>
                         <a href="/historial" class="dropdown-item">Historial</a>
                         <div class="dropdown-divider"></div>
                         <button class="dropdown-item" onclick="cerrarSesion()">Salir</button>
                     </div>
                 </div>
+                <div id="loginContainer" style="display: block;">
+                    <button class="login-button" onclick="iniciarSesionGoogle()">Iniciar Sesión</button>
+                </div>
             </div>
         </header>
 
-        <div class="historial-container">
-            <h1 class="page-title">Historial</h1>
-            
-            <div class="historial-actions">
-                <button class="action-btn" onclick="limpiarHistorial()" style="background: #ff4444;">Limpiar Historial</button>
-                <button class="action-btn" onclick="exportarHistorial()">Exportar Historial</button>
+        <main class="video-player-container">
+            <div class="player-section">
+                <div class="video-player" id="videoPlayer"></div>
+                <div class="video-info-detailed">
+                    <h1 class="video-title-detailed" id="videoTitle">Cargando...</h1>
+                    <div class="channel-info">
+                        <div class="channel-details">
+                            <div class="channel-name" id="channelName"></div>
+                        </div>
+                        <button class="subscribe-btn" onclick="alert('Suscrito!')">Suscribirse</button>
+                    </div>
+                    <div class="video-description-detailed" id="videoDescription"></div>
+                </div>
             </div>
-            
-            <h2 class="section-title">Búsquedas recientes</h2>
-            <div id="searchHistory">
-                <div class="loading">Cargando búsquedas...</div>
+            <div class="suggestions-section">
+                <h3 class="suggestions-title">Sugerencias</h3>
+                <div class="suggestions-list" id="suggestionsList"></div>
             </div>
-            
-            <div class="divider"></div>
-            
-            <h2 class="section-title">Vistos Recientemente</h2>
-            <div id="videoHistory">
-                <div class="loading">Cargando historial de videos...</div>
-            </div>
-        </div>
+        </main>
     </div>
 
     <script>
-        // Cargar historial al iniciar
-        document.addEventListener('DOMContentLoaded', function() {
-            cargarDatosUsuario();
-            cargarHistorial();
-        });
-
-        function cargarDatosUsuario() {
-            // Simular datos del usuario
-            const usuario = {
-                nombre: 'Usuario Ejemplo',
-                ubicacion: 'Oaxaca de Juárez, Oaxaca'
-            };
-            document.getElementById('userName').textContent = usuario.nombre;
-            document.getElementById('currentLocation').textContent = usuario.ubicacion;
-        }
-
-        async function cargarHistorial() {
-            try {
-                const response = await fetch('/api/history');
-                const data = await response.json();
-                
-                mostrarHistorialBusquedas(data.searches);
-                mostrarHistorialVideos(data.videos);
-            } catch (error) {
-                console.error('Error cargando historial:', error);
-                // Mostrar datos de ejemplo si hay error
-                mostrarHistorialBusquedas(['Dios nunca muere', 'Oaxaca música', 'Guelaguetza']);
-                mostrarHistorialVideos([
-                    {
-                        id: '1',
-                        title: 'The Phantom of the Opera Directo desde el Macedonio Alcalá',
-                        channel: 'The Shows Must Go On!',
-                        watchedAt: new Date().toISOString(),
-                        thumbnail: 'https://img.youtube.com/vi/ejemplo1/mqdefault.jpg'
-                    },
-                    {
-                        id: '2',
-                        title: 'BBIHF (Live in Oaxaca)',
-                        channel: 'BBIHF',
-                        watchedAt: new Date().toISOString(),
-                        thumbnail: 'https://img.youtube.com/vi/ejemplo2/mqdefault.jpg'
-                    },
-                    {
-                        id: '3',
-                        title: 'DIOS NUNCA MUERE HIMNO DE LOS OAXAQUENOS "YI NABAN"',
-                        channel: 'Reyes Escamilla',
-                        watchedAt: new Date().toISOString(),
-                        thumbnail: 'https://img.youtube.com/vi/ejemplo3/mqdefault.jpg'
-                    }
-                ]);
-            }
-        }
-
-        function mostrarHistorialBusquedas(busquedas) {
-            const searchHistory = document.getElementById('searchHistory');
-            
-            if (busquedas.length === 0) {
-                searchHistory.innerHTML = '<div class="no-data">No hay búsquedas recientes</div>';
-                return;
-            }
-
-            searchHistory.innerHTML = busquedas.map(busqueda => `
-                <div class="search-item" onclick="realizarBusqueda('${busqueda}')">
-                    🔍 ${busqueda}
-                </div>
-            `).join('');
-        }
-
-        function mostrarHistorialVideos(videos) {
-            const videoHistory = document.getElementById('videoHistory');
-            
-            if (videos.length === 0) {
-                videoHistory.innerHTML = '<div class="no-data">No hay videos vistos recientemente</div>';
-                return;
-            }
-
-            videoHistory.innerHTML = videos.map(video => `
-                <div class="video-item" onclick="abrirVideo('${video.id}')">
-                    <div class="video-thumbnail" style="background-image: url('${video.thumbnail || 'https://via.placeholder.com/160x90?text=Video'}')"></div>
-                    <div class="video-info">
-                        <div class="video-title">${video.title}</div>
-                        <div class="video-channel">${video.channel}</div>
-                        <div class="video-stats">Visto el ${formatearFecha(video.watchedAt)}</div>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function formatearFecha(fecha) {
-            return new Date(fecha).toLocaleDateString('es-MX', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-        }
-
-        function realizarBusqueda(termino) {
-            // Redirigir al inicio con la búsqueda
-            window.location.href = `/?search=${encodeURIComponent(termino)}`;
-        }
-
-        function abrirVideo(videoId) {
-            if (videoId.startsWith('http')) {
-                window.open(videoId, '_blank');
-            } else {
-                window.open(`https://www.youtube.com/watch?v=${videoId}`, '_blank');
-            }
-        }
-
-        function limpiarHistorial() {
-            if (confirm('¿Estás seguro de que quieres limpiar todo tu historial? Esta acción no se puede deshacer.')) {
-                // Aquí se llamaría al backend para limpiar el historial
-                document.getElementById('searchHistory').innerHTML = '<div class="no-data">No hay búsquedas recientes</div>';
-                document.getElementById('videoHistory').innerHTML = '<div class="no-data">No hay videos vistos recientemente</div>';
-                alert('Historial limpiado correctamente');
-            }
-        }
-
-        function exportarHistorial() {
-            alert('Funcionalidad de exportación en desarrollo');
-        }
-
-        // Menú de usuario
-        const userMenuButton = document.getElementById('userMenuButton');
-        const dropdownMenu = document.getElementById('dropdownMenu');
-
-        userMenuButton.addEventListener('click', function() {
-            dropdownMenu.classList.toggle('show');
-        });
-
-        window.addEventListener('click', function(e) {
-            if (!e.target.matches('.user-button') && !e.target.closest('.user-button')) {
-                if (dropdownMenu.classList.contains('show')) {
-                    dropdownMenu.classList.remove('show');
-                }
-            }
-        });
-
-        function cerrarSesion() {
-            if (confirm('¿Estás seguro de que quieres cerrar sesión?')) {
-                alert('Sesión cerrada - Redirigiendo al inicio');
-                window.location.href = '/';
-            }
-            dropdownMenu.classList.remove('show');
-        }
+        var tag = document.createElement('script');
+        tag.src = "https://www.youtube.com/iframe_api";
+        var firstScriptTag = document.getElementsByTagName('script')[0];
+        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
     </script>
 
-    <style>
-        .historial-actions {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+
+    <script>
+        const firebaseConfig = {
+          apiKey: "AIzaSyDYT4mQRUmZXhu1GwYJbcavtQYzr0eHeu0",
+          authDomain: "videito-c89a2.firebaseapp.com",
+          projectId: "videito-c89a2",
+          storageBucket: "videito-c89a2.firebasestorage.app",
+          messagingSenderId: "587797165631",
+          appId: "1:587797165631:web:3d9f16e83cf57497d46a8a",
+          measurementId: "G-H837KE6W6K"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                document.getElementById('userMenuContainer').style.display = 'block';
+                document.getElementById('loginContainer').style.display = 'none';
+                document.getElementById('userName').textContent = user.displayName;
+                document.getElementById('userAvatarHeader').style.backgroundImage = `url(${user.photoURL})`;
+            } else {
+                document.getElementById('userMenuContainer').style.display = 'none';
+                document.getElementById('loginContainer').style.display = 'block';
+            }
+        });
+
+        function iniciarSesionGoogle() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            auth.signInWithPopup(provider).catch(e => alert(e.message));
+        }
+        function cerrarSesion() { auth.signOut().then(() => window.location.reload()); }
+
+        let player, currentVideoInfo;
+        function onYouTubeIframeAPIReady() {
+            const params = new URLSearchParams(window.location.search);
+            const id = params.get('v');
+            if(id) {
+                cargarVideo(id);
+                cargarSugerencias();
+            }
         }
 
-        .no-data {
-            text-align: center;
-            padding: 40px;
-            color: #666;
-            font-style: italic;
+        function cargarVideo(id) {
+            if(player) player.loadVideoById(id);
+            else player = new YT.Player('videoPlayer', { height: '500', width: '100%', videoId: id, events: { 'onStateChange': onPlayerStateChange } });
+            obtenerInfo(id);
         }
 
-        .search-item {
-            background: #1a1a1a;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            cursor: pointer;
-            transition: background 0.2s;
-            border-left: 4px solid #ff6b6b;
+        function onPlayerStateChange(event) {
+            // Solo guardamos si está reproduciendo Y tenemos info válida
+            if (event.data === YT.PlayerState.PLAYING && currentVideoInfo) {
+                guardarEnHistorial(currentVideoInfo);
+            }
         }
 
-        .search-item:hover {
-            background: #222;
-            transform: translateX(5px);
+        async function obtenerInfo(id) {
+            try {
+                const res = await fetch(`/api/video-info?v=${id}`);
+                if(!res.ok) throw new Error('Err');
+                const data = await res.json();
+                if(data.success) {
+                    currentVideoInfo = data.video;
+                    document.getElementById('videoTitle').textContent = data.video.title;
+                    document.getElementById('channelName').textContent = data.video.channelTitle;
+                    document.getElementById('videoDescription').textContent = data.video.description;
+                }
+            } catch(e) {
+                // Fallback
+                currentVideoInfo = { id: id, title: "Video de YouTube", channelTitle: "Desconocido", thumbnail: `https://i.ytimg.com/vi/${id}/mqdefault.jpg` };
+                document.getElementById('videoTitle').textContent = "Video de YouTube (Sin Info)";
+            }
         }
-    </style>
+
+        async function guardarEnHistorial(info) {
+            const user = auth.currentUser;
+            if(!user) return;
+            await db.collection('usuarios').doc(user.uid).collection('historial').doc(info.id).set({
+                videoId: info.id, title: info.title, channelTitle: info.channelTitle, thumbnail: info.thumbnail, vistoPorUltimaVez: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+        }
+
+        async function cargarSugerencias() {
+            try {
+                const res = await fetch(`/api/videos?location=Oaxaca`);
+                const data = await res.json();
+                if(data.videos) {
+                    document.getElementById('suggestionsList').innerHTML = data.videos.map(v => `
+                        <div class="suggestion-item" onclick="window.location.href='/reproduccion?v=${v.id}'">
+                            <div class="suggestion-thumbnail" style="background-image: url('${v.thumbnail}')"></div>
+                            <div class="suggestion-info"><div>${v.title}</div></div>
+                        </div>`).join('');
+                }
+            } catch(e) {}
+        }
+
+        function buscarVideos() { window.location.href = `/?search=${document.getElementById('searchInput').value}`; }
+        
+        document.getElementById('userMenuButton').addEventListener('click', (e) => { e.stopPropagation(); document.getElementById('dropdownMenu').classList.toggle('show'); });
+        window.addEventListener('click', () => document.getElementById('dropdownMenu').classList.remove('show'));
+    </script>
 </body>
 </html>
