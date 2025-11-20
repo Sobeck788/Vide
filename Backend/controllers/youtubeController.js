@@ -7,75 +7,118 @@ class YouTubeController {
         console.log('🎬 Controlador de YouTube inicializado');
     }
 
+    // Función auxiliar para quitar acentos
+    normalizeString(str) {
+        return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    }
+
     getLocationCoordinates(locationName) {
+        // Base de datos de coordenadas
         const locations = {
             // México
-            'oaxaca': { lat: 17.0732, lng: -96.7266, radius: '100km' },
-            'ciudad de mexico': { lat: 19.4326, lng: -99.1332, radius: '100km' },
-            'cdmx': { lat: 19.4326, lng: -99.1332, radius: '100km' },
-            'mexico city': { lat: 19.4326, lng: -99.1332, radius: '100km' },
-            'guadalajara': { lat: 20.6597, lng: -103.3496, radius: '100km' },
-            'monterrey': { lat: 25.6866, lng: -100.3161, radius: '100km' },
-            'puebla': { lat: 19.0414, lng: -98.2063, radius: '100km' },
+            'oaxaca': { lat: 17.0732, lng: -96.7266, radius: '50km' },
+            'ciudad de mexico': { lat: 19.4326, lng: -99.1332, radius: '50km' },
+            'cdmx': { lat: 19.4326, lng: -99.1332, radius: '50km' },
+            'puebla': { lat: 19.0414, lng: -98.2063, radius: '50km' },
+            'monterrey': { lat: 25.6866, lng: -100.3161, radius: '50km' },
+            'guadalajara': { lat: 20.6597, lng: -103.3496, radius: '50km' },
             
-            // Países
-            'china': { lat: 35.8617, lng: 104.1954, radius: '500km' },
-            'estados unidos': { lat: 37.0902, lng: -95.7129, radius: '1000km' },
-            'usa': { lat: 37.0902, lng: -95.7129, radius: '1000km' },
+            // Internacional (con y sin acentos)
+            'japon': { lat: 36.2048, lng: 138.2529, radius: '500km' },
+            'tokio': { lat: 35.6762, lng: 139.6503, radius: '100km' },
             'españa': { lat: 40.4637, lng: -3.7492, radius: '500km' },
-            'japón': { lat: 36.2048, lng: 138.2529, radius: '500km' },
+            'madrid': { lat: 40.4168, lng: -3.7038, radius: '100km' },
+            'usa': { lat: 37.0902, lng: -95.7129, radius: '1000km' },
+            'estados unidos': { lat: 37.0902, lng: -95.7129, radius: '1000km' },
+            'china': { lat: 35.8617, lng: 104.1954, radius: '1000km' },
             'argentina': { lat: -38.4161, lng: -63.6167, radius: '1000km' },
-            'brasil': { lat: -14.2350, lng: -51.9253, radius: '1000km' }
+            'brasil': { lat: -14.2350, lng: -51.9253, radius: '1000km' },
+            'colombia': { lat: 4.5709, lng: -74.2973, radius: '500km' }
         };
 
-        const normalizedLocation = locationName.toLowerCase().trim();
-        return locations[normalizedLocation] || locations['oaxaca'];
+        // Normalizamos la entrada (quitamos acentos y minúsculas)
+        const cleanName = this.normalizeString(locationName);
+        
+        // Buscamos la coincidencia o devolvemos Oaxaca por defecto
+        if (locations[cleanName]) {
+            return locations[cleanName];
+        } else {
+            console.log(`⚠️ Ubicación '${locationName}' no encontrada, usando OAXACA por defecto.`);
+            return locations['oaxaca'];
+        }
     }
 
     async searchVideos(location, searchQuery = '', maxResults = 10) {
         try {
-            console.log(`🎬 Buscando: "${location}" - "${searchQuery}"`);
-
-            // Verificar API Key
-            const hasValidAPIKey = this.apiKey && this.apiKey !== 'tu_api_key_de_youtube_aqui';
-            
-            if (!hasValidAPIKey) {
-                console.log('📹 Usando datos de ejemplo');
-                return this.getMockVideos(location, searchQuery, maxResults);
-            }
-
-            console.log('🔑 Usando API Key real de YouTube');
             const locationCoords = this.getLocationCoordinates(location);
-            
+            console.log(`📍 Buscando en: ${location} (Lat: ${locationCoords.lat}, Lng: ${locationCoords.lng})`);
+
+            // Construcción inteligente de la query
+            // Si hay búsqueda de texto, usamos eso. Si no, usamos "vlog" o "travel" para que salgan cosas interesantes
+            let q = searchQuery;
+            if (!q) q = "vlog travel daily"; 
+
             const params = {
                 part: 'snippet',
                 type: 'video',
                 maxResults: maxResults,
                 key: this.apiKey,
-                q: searchQuery ? `${searchQuery} ${location}` : location
+                q: q, // NO agregamos el nombre de la ubicación al texto, ya filtramos por GPS abajo
+                location: `${locationCoords.lat},${locationCoords.lng}`,
+                locationRadius: locationCoords.radius
             };
 
-            // Solo usar ubicación si no es global
-            if (location !== 'global') {
-                params.location = `${locationCoords.lat},${locationCoords.lng}`;
-                params.locationRadius = locationCoords.radius;
+            // Si no hay API Key, lanzamos error para usar el Mock Data del frontend
+            if (!this.apiKey || this.apiKey === 'tu_api_key_de_youtube_aqui') {
+                throw new Error('No API Key configurada');
             }
 
-            const response = await axios.get(`${this.baseURL}/search`, { 
-                params,
-                timeout: 10000
-            });
+            const response = await axios.get(`${this.baseURL}/search`, { params });
             
-            if (response.data.items && response.data.items.length > 0) {
-                console.log(`✅ Encontrados ${response.data.items.length} videos reales`);
+            if (response.data.items) {
                 return this.formatVideos(response.data.items);
-            } else {
-                return this.getMockVideos(location, searchQuery, maxResults);
             }
+            return [];
+
         } catch (error) {
-            console.error('❌ Error en búsqueda:', error.message);
-            return this.getMockVideos(location, searchQuery, maxResults);
+            console.error('❌ Error backend:', error.message);
+            // Retornamos array vacío para que el Frontend use sus datos Demo
+            return []; 
         }
+    }
+
+    async getVideoDetails(videoId) {
+         try {
+            if (!this.apiKey) throw new Error('No API Key');
+
+            const response = await axios.get(`${this.baseURL}/videos`, {
+                params: {
+                    part: 'snippet,statistics',
+                    id: videoId,
+                    key: this.apiKey
+                }
+            });
+
+            if (response.data.items && response.data.items.length > 0) {
+                const video = response.data.items[0];
+                return {
+                    id: video.id,
+                    title: video.snippet.title,
+                    description: video.snippet.description,
+                    channelTitle: video.snippet.channelTitle,
+                    channelId: video.snippet.channelId, // Importante para suscripciones
+                    publishedAt: video.snippet.publishedAt,
+                    thumbnail: video.snippet.thumbnails.high ? video.snippet.thumbnails.high.url : video.snippet.thumbnails.medium.url,
+                    viewCount: video.statistics.viewCount,
+                    likeCount: video.statistics.likeCount,
+                    subscriberCount: '1M' // YouTube API search no da esto fácil, lo simulamos
+                };
+            }
+            return null;
+         } catch (error) {
+             console.error('Error detalles video:', error.message);
+             return null;
+         }
     }
 
     formatVideos(videos) {
@@ -85,72 +128,8 @@ class YouTubeController {
             description: video.snippet.description,
             channelTitle: video.snippet.channelTitle,
             publishedAt: video.snippet.publishedAt,
-            thumbnail: video.snippet.thumbnails.medium.url,
-            liveBroadcastContent: video.snippet.liveBroadcastContent,
-            viewCount: Math.floor(Math.random() * 1000000).toString(),
-            likeCount: Math.floor(Math.random() * 50000).toString()
+            thumbnail: video.snippet.thumbnails.medium.url
         }));
-    }
-
-    getMockVideos(location, searchQuery, maxResults = 10) {
-        console.log(`🎭 Generando ${maxResults} videos de ejemplo para: ${location} - "${searchQuery}"`);
-        
-        const baseVideos = [
-            {
-                id: 'tUrVwCBPUpY',
-                title: `OAXACA de Juárez en 4 días: guía de viaje completa 🇲🇽🫔🌽 - ${searchQuery || location}`,
-                description: `Descubre ${location} en 4 días | Guía completa de viaje ${location} es una de las joyas culturales y gastronómicas`,
-                channelTitle: `Turismo ${location}`,
-                publishedAt: new Date().toISOString(),
-                thumbnail: `https://via.placeholder.com/320x180/ff6b6b/white?text=${encodeURIComponent(location)}`,
-                viewCount: '15420',
-                likeCount: '843',
-                liveBroadcastContent: 'none'
-            },
-            {
-                id: 'GWQUkTZNv8U',
-                title: `TOP 10 Lugares Increíbles en ${location} que Tienes que Visitar`,
-                description: `${location} es un destino que deslumbra con su riqueza cultural, histórica y natural`,
-                channelTitle: `Viajes ${location}`,
-                publishedAt: new Date(Date.now() - 86400000).toISOString(),
-                thumbnail: `https://via.placeholder.com/320x180/4ecdc4/white?text=Lugares+${encodeURIComponent(location)}`,
-                viewCount: '8920',
-                likeCount: '521',
-                liveBroadcastContent: 'none'
-            },
-            {
-                id: '66xt4fGrIMg',
-                title: `Música y Cultura de ${location} - ${searchQuery || 'Tradiciones'}`,
-                description: `Disfruta de la riqueza musical y cultural de ${location}`,
-                channelTitle: `Cultura ${location}`,
-                publishedAt: new Date(Date.now() - 172800000).toISOString(),
-                thumbnail: `https://via.placeholder.com/320x180/45b7d1/white?text=Música+${encodeURIComponent(location)}`,
-                viewCount: '12350',
-                likeCount: '678',
-                liveBroadcastContent: 'none'
-            },
-            {
-                id: '4G1GhYLNaWM',
-                title: `Gastronomía ${location} - ${searchQuery || 'Platillos Típicos'}`,
-                description: `Los mejores platillos y restaurantes de ${location}`,
-                channelTitle: `Sabores ${location}`,
-                publishedAt: new Date(Date.now() - 259200000).toISOString(),
-                thumbnail: `https://via.placeholder.com/320x180/96ceb4/white?text=Comida+${encodeURIComponent(location)}`,
-                viewCount: '7650',
-                likeCount: '432',
-                liveBroadcastContent: 'none'
-            }
-        ];
-
-        // Generar más videos si se necesitan
-        while (baseVideos.length < maxResults) {
-            baseVideos.push({
-                ...baseVideos[baseVideos.length % baseVideos.length],
-                id: 'vid_' + Math.random().toString(36).substr(2, 9)
-            });
-        }
-
-        return baseVideos.slice(0, maxResults);
     }
 }
 
