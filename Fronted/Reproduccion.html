@@ -16,66 +16,47 @@
                     <button class="search-button" onclick="buscarVideos()">Buscar</button>
                 </div>
             </div>
-            
             <div class="location-user-section">
-                <div class="user-location" id="locationDisplay">
-                    Tu ubicación: <span id="currentLocation">Oaxaca</span>
-                </div>
-                
-                <div class="user-menu">
+                <div class="user-menu" id="userMenuContainer" style="display: none;">
                     <button class="user-button" id="userMenuButton">
                         <div class="user-authenticated">
-                            <div class="user-avatar"></div>
+                            <div class="user-avatar" id="userAvatarHeader"></div>
                             <span id="userName">Usuario</span>
                         </div>
                     </button>
                     <div class="dropdown-menu" id="dropdownMenu">
-                        <a href="/perfil" class="dropdown-item">Mi Perfil</a>
                         <a href="/historial" class="dropdown-item">Historial</a>
                         <div class="dropdown-divider"></div>
                         <button class="dropdown-item" onclick="cerrarSesion()">Salir</button>
                     </div>
+                </div>
+                <div id="loginContainer" style="display: block;">
+                    <button class="login-button" onclick="iniciarSesionGoogle()">Iniciar Sesión</button>
                 </div>
             </div>
         </header>
 
         <main class="video-player-container">
             <div class="player-section">
-                <div class="video-player" id="videoPlayer">
-                    <div class="loading-player">Cargando video...</div>
-                </div>
-                
+                <div class="video-player" id="videoPlayer"></div>
                 <div class="video-info-detailed">
                     <h1 class="video-title-detailed" id="videoTitle">Cargando...</h1>
-                    <div class="video-stats-detailed">
-                        <span class="view-count" id="viewCount">- vistas</span>
-                        <span class="like-count" id="likeCount">- me gusta</span>
-                        <span class="publish-date" id="publishDate">-</span>
-                    </div>
                     <div class="channel-info">
-                        <div class="channel-avatar" id="channelAvatar"></div>
                         <div class="channel-details">
-                            <div class="channel-name" id="channelName">Cargando...</div>
-                            <div class="subscriber-count" id="subscriberCount">- suscriptores</div>
+                            <div class="channel-name" id="channelName"></div>
                         </div>
-                        <button class="subscribe-btn" onclick="suscribirse()">Suscribirse</button>
+                        <button class="subscribe-btn" onclick="alert('Suscrito!')">Suscribirse</button>
                     </div>
-                    <div class="video-description-detailed" id="videoDescription">
-                        Cargando descripción...
-                    </div>
+                    <div class="video-description-detailed" id="videoDescription"></div>
                 </div>
             </div>
-
             <div class="suggestions-section">
                 <h3 class="suggestions-title">Sugerencias</h3>
-                <div class="suggestions-list" id="suggestionsList">
-                    <div class="loading">Cargando sugerencias...</div>
-                </div>
+                <div class="suggestions-list" id="suggestionsList"></div>
             </div>
         </main>
     </div>
 
-    <!-- YouTube IFrame API -->
     <script>
         var tag = document.createElement('script');
         tag.src = "https://www.youtube.com/iframe_api";
@@ -83,274 +64,109 @@
         firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
     </script>
 
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+
     <script>
-        let player = null;
-        let currentVideoId = null;
-        let currentLocation = 'Oaxaca';
-        let currentSearch = '';
+        const firebaseConfig = {
+          apiKey: "AIzaSyDYT4mQRUmZXhu1GwYJbcavtQYzr0eHeu0",
+          authDomain: "videito-c89a2.firebaseapp.com",
+          projectId: "videito-c89a2",
+          storageBucket: "videito-c89a2.firebasestorage.app",
+          messagingSenderId: "587797165631",
+          appId: "1:587797165631:web:3d9f16e83cf57497d46a8a",
+          measurementId: "G-H837KE6W6K"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
 
-        // Obtener parámetros de la URL
-        function getUrlParams() {
-            const urlParams = new URLSearchParams(window.location.search);
-            return {
-                v: urlParams.get('v'), // video ID
-                location: urlParams.get('location') || 'Oaxaca',
-                search: urlParams.get('search') || ''
-            };
-        }
-
-        // Cuando YouTube API esté lista
-        function onYouTubeIframeAPIReady() {
-            console.log('✅ YouTube API lista');
-            const params = getUrlParams();
-            
-            if (params.v) {
-                currentVideoId = params.v;
-                currentLocation = params.location;
-                currentSearch = params.search;
-                
-                cargarVideo(currentVideoId);
-                cargarSugerencias(currentLocation, currentSearch);
-                
-                // Actualizar ubicación en la UI
-                document.getElementById('currentLocation').textContent = currentLocation;
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                document.getElementById('userMenuContainer').style.display = 'block';
+                document.getElementById('loginContainer').style.display = 'none';
+                document.getElementById('userName').textContent = user.displayName;
+                document.getElementById('userAvatarHeader').style.backgroundImage = `url(${user.photoURL})`;
             } else {
-                document.getElementById('videoPlayer').innerHTML = 
-                    '<div class="error">No se especificó un video para reproducir</div>';
+                document.getElementById('userMenuContainer').style.display = 'none';
+                document.getElementById('loginContainer').style.display = 'block';
+            }
+        });
+
+        function iniciarSesionGoogle() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            auth.signInWithPopup(provider).catch(e => alert(e.message));
+        }
+        function cerrarSesion() { auth.signOut().then(() => window.location.reload()); }
+
+        let player, currentVideoInfo;
+        function onYouTubeIframeAPIReady() {
+            const params = new URLSearchParams(window.location.search);
+            const id = params.get('v');
+            if(id) {
+                cargarVideo(id);
+                cargarSugerencias();
             }
         }
 
-        // Cargar y reproducir el video
-        function cargarVideo(videoId) {
-            console.log('🎬 Cargando video:', videoId);
-            
-            player = new YT.Player('videoPlayer', {
-                height: '500',
-                width: '100%',
-                videoId: videoId,
-                playerVars: {
-                    'playsinline': 1,
-                    'rel': 0,
-                    'modestbranding': 1,
-                    'autoplay': 1,
-                    'controls': 1
-                },
-                events: {
-                    'onReady': onPlayerReady,
-                    'onStateChange': onPlayerStateChange,
-                    'onError': onPlayerError
-                }
-            });
-        }
-
-        function onPlayerReady(event) {
-            console.log('✅ Reproductor listo');
-            obtenerInformacionVideo(currentVideoId);
+        function cargarVideo(id) {
+            if(player) player.loadVideoById(id);
+            else player = new YT.Player('videoPlayer', { height: '500', width: '100%', videoId: id, events: { 'onStateChange': onPlayerStateChange } });
+            obtenerInfo(id);
         }
 
         function onPlayerStateChange(event) {
-            if (event.data === YT.PlayerState.PLAYING) {
-                console.log('▶️ Video reproduciéndose');
+            // Solo guardamos si está reproduciendo Y tenemos info válida
+            if (event.data === YT.PlayerState.PLAYING && currentVideoInfo) {
+                guardarEnHistorial(currentVideoInfo);
             }
         }
 
-        function onPlayerError(error) {
-            console.error('❌ Error en reproductor:', error);
-            document.getElementById('videoPlayer').innerHTML = 
-                '<div class="error">Error al cargar el video</div>';
-        }
-
-        // Obtener información del video
-        async function obtenerInformacionVideo(videoId) {
+        async function obtenerInfo(id) {
             try {
-                const response = await fetch(`/api/video-info?v=${videoId}`);
-                const data = await response.json();
-                
-                if (data.success) {
-                    mostrarInformacionVideo(data.video);
-                } else {
-                    mostrarInformacionPorDefecto(videoId);
+                const res = await fetch(`/api/video-info?v=${id}`);
+                if(!res.ok) throw new Error('Err');
+                const data = await res.json();
+                if(data.success) {
+                    currentVideoInfo = data.video;
+                    document.getElementById('videoTitle').textContent = data.video.title;
+                    document.getElementById('channelName').textContent = data.video.channelTitle;
+                    document.getElementById('videoDescription').textContent = data.video.description;
                 }
-            } catch (error) {
-                console.error('Error obteniendo información:', error);
-                mostrarInformacionPorDefecto(videoId);
+            } catch(e) {
+                // Fallback
+                currentVideoInfo = { id: id, title: "Video de YouTube", channelTitle: "Desconocido", thumbnail: `https://i.ytimg.com/vi/${id}/mqdefault.jpg` };
+                document.getElementById('videoTitle').textContent = "Video de YouTube (Sin Info)";
             }
         }
 
-        function mostrarInformacionVideo(video) {
-            document.getElementById('videoTitle').textContent = video.title;
-            document.getElementById('viewCount').textContent = `${formatearNumero(video.viewCount)} vistas`;
-            document.getElementById('likeCount').textContent = `${formatearNumero(video.likeCount)} me gusta`;
-            document.getElementById('publishDate').textContent = formatearFecha(video.publishedAt);
-            document.getElementById('channelName').textContent = video.channelTitle;
-            document.getElementById('videoDescription').textContent = video.description || 'Descripción no disponible';
-            
-            // Avatar del canal
-            const channelAvatar = document.getElementById('channelAvatar');
-            channelAvatar.textContent = video.channelTitle.charAt(0).toUpperCase();
-            channelAvatar.style.background = generarColorDesdeTexto(video.channelTitle);
+        async function guardarEnHistorial(info) {
+            const user = auth.currentUser;
+            if(!user) return;
+            await db.collection('usuarios').doc(user.uid).collection('historial').doc(info.id).set({
+                videoId: info.id, title: info.title, channelTitle: info.channelTitle, thumbnail: info.thumbnail, vistoPorUltimaVez: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
         }
 
-        function mostrarInformacionPorDefecto(videoId) {
-            document.getElementById('videoTitle').textContent = 'Video de YouTube';
-            document.getElementById('channelName').textContent = 'Canal de YouTube';
-            document.getElementById('videoDescription').textContent = 'Descripción no disponible';
-        }
-
-        // Cargar videos sugeridos
-        async function cargarSugerencias(location, search) {
+        async function cargarSugerencias() {
             try {
-                const response = await fetch(`/api/videos?location=${location}&search=${search}&maxResults=8`);
-                const data = await response.json();
-                
-                if (data.success) {
-                    mostrarSugerencias(data.videos);
+                const res = await fetch(`/api/videos?location=Oaxaca`);
+                const data = await res.json();
+                if(data.videos) {
+                    document.getElementById('suggestionsList').innerHTML = data.videos.map(v => `
+                        <div class="suggestion-item" onclick="window.location.href='/reproduccion?v=${v.id}'">
+                            <div class="suggestion-thumbnail" style="background-image: url('${v.thumbnail}')"></div>
+                            <div class="suggestion-info"><div>${v.title}</div></div>
+                        </div>`).join('');
                 }
-            } catch (error) {
-                console.error('Error cargando sugerencias:', error);
-                document.getElementById('suggestionsList').innerHTML = 
-                    '<div class="error">Error cargando sugerencias</div>';
-            }
+            } catch(e) {}
         }
 
-        function mostrarSugerencias(videos) {
-            const suggestionsList = document.getElementById('suggestionsList');
-            
-            // Filtrar el video actual de las sugerencias
-            const sugerenciasFiltradas = videos.filter(video => video.id !== currentVideoId).slice(0, 6);
-            
-            if (sugerenciasFiltradas.length === 0) {
-                suggestionsList.innerHTML = '<div class="no-data">No hay sugerencias disponibles</div>';
-                return;
-            }
-
-            suggestionsList.innerHTML = sugerenciasFiltradas.map(video => `
-                <div class="suggestion-item" onclick="cambiarVideo('${video.id}')">
-                    <div class="suggestion-thumbnail" style="background-image: url('${video.thumbnail}')"></div>
-                    <div class="suggestion-info">
-                        <div class="suggestion-title">${video.title.substring(0, 50)}${video.title.length > 50 ? '...' : ''}</div>
-                        <div class="suggestion-channel">${video.channelTitle}</div>
-                        <div class="suggestion-views">${formatearNumero(video.viewCount || '0')} vistas</div>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        // Cambiar a otro video
-        function cambiarVideo(nuevoVideoId) {
-            // Actualizar URL sin recargar la página
-            const nuevaUrl = `${window.location.pathname}?v=${nuevoVideoId}&location=${currentLocation}&search=${currentSearch}`;
-            window.history.pushState({}, '', nuevaUrl);
-            
-            currentVideoId = nuevoVideoId;
-            
-            // Recargar el video
-            if (player) {
-                player.loadVideoById(nuevoVideoId);
-                player.playVideo();
-            } else {
-                cargarVideo(nuevoVideoId);
-            }
-            
-            // Recargar información y sugerencias
-            obtenerInformacionVideo(nuevoVideoId);
-            cargarSugerencias(currentLocation, currentSearch);
-            
-            // Scroll to top
-            window.scrollTo(0, 0);
-        }
-
-        // Utilidades
-        function formatearFecha(fecha) {
-            const date = new Date(fecha);
-            return date.toLocaleDateString('es-MX', { 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-            });
-        }
-
-        function formatearNumero(num) {
-            const number = parseInt(num);
-            if (number >= 1000000) {
-                return (number / 1000000).toFixed(1) + 'M';
-            } else if (number >= 1000) {
-                return (number / 1000).toFixed(1) + 'K';
-            }
-            return number.toLocaleString('es-MX');
-        }
-
-        function generarColorDesdeTexto(texto) {
-            let hash = 0;
-            for (let i = 0; i < texto.length; i++) {
-                hash = texto.charCodeAt(i) + ((hash << 5) - hash);
-            }
-            const colores = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3'];
-            return colores[Math.abs(hash) % colores.length];
-        }
-
-        function suscribirse() {
-            alert('Funcionalidad de suscripción en desarrollo');
-        }
-
-        // Navegación
-        function buscarVideos() {
-            const searchInput = document.getElementById('searchInput');
-            const search = searchInput.value.trim();
-            
-            if (search) {
-                window.location.href = `/?search=${encodeURIComponent(search)}`;
-            }
-        }
-
-        // Menú de usuario
-        document.addEventListener('DOMContentLoaded', function() {
-            const userMenuButton = document.getElementById('userMenuButton');
-            const dropdownMenu = document.getElementById('dropdownMenu');
-
-            if (userMenuButton && dropdownMenu) {
-                userMenuButton.addEventListener('click', function() {
-                    dropdownMenu.classList.toggle('show');
-                });
-
-                window.addEventListener('click', function(e) {
-                    if (!e.target.matches('.user-button') && !e.target.closest('.user-button')) {
-                        if (dropdownMenu.classList.contains('show')) {
-                            dropdownMenu.classList.remove('show');
-                        }
-                    }
-                });
-            }
-
-            // Configurar búsqueda con Enter
-            const searchInput = document.getElementById('searchInput');
-            if (searchInput) {
-                searchInput.addEventListener('keypress', function(e) {
-                    if (e.key === 'Enter') {
-                        buscarVideos();
-                    }
-                });
-            }
-        });
-
-        function cerrarSesion() {
-            if (confirm('¿Estás seguro de que quieres cerrar sesión?')) {
-                alert('Sesión cerrada');
-                window.location.href = '/';
-            }
-            const dropdownMenu = document.getElementById('dropdownMenu');
-            if (dropdownMenu) {
-                dropdownMenu.classList.remove('show');
-            }
-        }
-
-        // Manejar navegación con el botón atrás/adelante
-        window.addEventListener('popstate', function() {
-            const params = getUrlParams();
-            if (params.v && params.v !== currentVideoId) {
-                cambiarVideo(params.v);
-            }
-        });
+        function buscarVideos() { window.location.href = `/?search=${document.getElementById('searchInput').value}`; }
+        
+        document.getElementById('userMenuButton').addEventListener('click', (e) => { e.stopPropagation(); document.getElementById('dropdownMenu').classList.toggle('show'); });
+        window.addEventListener('click', () => document.getElementById('dropdownMenu').classList.remove('show'));
     </script>
 </body>
 </html>
