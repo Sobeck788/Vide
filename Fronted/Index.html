@@ -120,14 +120,7 @@
                     guardarUsuarioEnDB(result.user);
                 }).catch((error) => {
                     console.error('Error login:', error);
-                    // MANEJO DE ERRORES COMUNES
-                    if (error.code === 'auth/unauthorized-domain') {
-                        alert('⚠️ ERROR DE DOMINIO:\nEste sitio web no está autorizado en tu Firebase.\n\nSOLUCIÓN: Descarga estos archivos y ábrelos en tu computadora (localhost) para probar el inicio de sesión.');
-                    } else if (error.code === 'auth/popup-closed-by-user') {
-                        alert('Cancelaste el inicio de sesión.');
-                    } else {
-                        alert('Error: ' + error.message);
-                    }
+                    alert('Error: ' + error.message);
                 });
         }
 
@@ -156,7 +149,7 @@
         }
 
         // ===================================
-        // 3. LÓGICA DE VIDEOS (Backend Local + Mock Fallback)
+        // 3. LÓGICA DE VIDEOS (Backend Local)
         // ===================================
         let currentLocation = 'Oaxaca';
         let currentSearch = '';
@@ -187,14 +180,9 @@
         });
 
         async function cargarVideos(searchQuery = '') {
-            const videoList = document.getElementById('videoList');
-            videoList.innerHTML = '<div class="loading">Cargando videos...</div>';
-            
             try {
-                // Intentamos llamar al backend
+                document.getElementById('videoList').innerHTML = '<div class="loading">Cargando...</div>';
                 const response = await fetch(`/api/videos?location=${currentLocation}&search=${encodeURIComponent(searchQuery)}`);
-                
-                if (!response.ok) throw new Error('Error de red');
                 const data = await response.json();
 
                 if (data.videos) { 
@@ -203,21 +191,7 @@
                         `Videos en ${currentLocation}${searchQuery ? ` - "${searchQuery}"` : ''}`;
                 }
             } catch (error) {
-                console.warn('Backend no detectado (Modo Demo activado):', error);
-                
-                // DATOS FALSOS (MOCK DATA) para que funcione la demo sin backend
-                const mockVideos = Array.from({length: 8}, (_, i) => ({
-                    id: `vid_${i}`,
-                    title: `Video de ${currentLocation} ${searchQuery} #${i + 1}`,
-                    thumbnail: `https://picsum.photos/300/200?random=${i}`,
-                    channelTitle: `Canal Local ${i}`,
-                    publishedAt: new Date().toISOString(),
-                    viewCount: Math.floor(Math.random() * 50000)
-                }));
-
-                mostrarVideos(mockVideos);
-                document.getElementById('locationInfo').textContent = 
-                    `Videos en ${currentLocation} (Modo Demostración)`;
+                console.error('Error:', error);
             }
         }
 
