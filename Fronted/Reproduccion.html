@@ -86,7 +86,7 @@
                 document.getElementById('userMenuContainer').style.display = 'block';
                 document.getElementById('loginContainer').style.display = 'none';
                 document.getElementById('userName').textContent = user.displayName;
-                document.getElementById('userAvatarHeader').style.backgroundImage = `url(${user.photoURL})`;
+                document.getElementById('userAvatarHeader').style.backgroundImage = url(${user.photoURL});
             } else {
                 document.getElementById('userMenuContainer').style.display = 'none';
                 document.getElementById('loginContainer').style.display = 'block';
@@ -104,8 +104,6 @@
         function onYouTubeIframeAPIReady() {
             const params = new URLSearchParams(window.location.search);
             const id = params.get('v');
-            
-            // RECUPERAR UBICACIÓN
             if (params.get('location')) currentLocation = params.get('location');
             document.getElementById('currentLocation').textContent = currentLocation;
             
@@ -118,7 +116,7 @@
 
         function cargarReproductor(id) {
             if (id.startsWith('vid_') || id.startsWith('demo_')) {
-                document.getElementById('videoPlayer').innerHTML = `<div style="color:white; height:100%; display:flex; justify-content:center; align-items:center; background:black;">Video Demo</div>`;
+                document.getElementById('videoPlayer').innerHTML = <div style="color:white; height:100%; display:flex; justify-content:center; align-items:center; background:black;">Video Demo</div>;
             } else {
                 player = new YT.Player('videoPlayer', { height: '500', width: '100%', videoId: id, playerVars: { 'autoplay': 1 } });
             }
@@ -126,15 +124,16 @@
 
         async function obtenerInfoYGuardar(id) {
             try {
-                const res = await fetch(`/api/video-info?v=${id}`);
+                const res = await fetch(/api/video-info?v=${id});
                 const data = await res.json();
                 if (data.success) {
                     currentVideoInfo = data.video;
                     mostrarDetalles(data.video);
+                    // 🔥 GUARDAR HISTORIAL INMEDIATAMENTE
                     guardarEnHistorial(data.video); 
                 } else { throw new Error("No data"); }
             } catch(e) {
-                const demo = { id: id, title: "Video Demo / No Info", channelTitle: "Demo", description: "Error al cargar datos.", thumbnail: `https://picsum.photos/seed/${id}/300/200` };
+                const demo = { id: id, title: "Video Demo / No Info", channelTitle: "Demo", description: "Error al cargar datos.", thumbnail: https://picsum.photos/seed/${id}/300/200 };
                 mostrarDetalles(demo);
                 guardarEnHistorial(demo);
             }
@@ -156,7 +155,7 @@
 
         async function cargarSugerencias(loc) {
             try {
-                const res = await fetch(`/api/videos?location=${loc}`);
+                const res = await fetch(/api/videos?location=${loc});
                 const data = await res.json();
                 if(data.videos) {
                     document.getElementById('suggestionsList').innerHTML = data.videos.map(v => `
@@ -169,8 +168,8 @@
         }
 
         function buscarVideos() { 
-            // BÚSQUEDA MANTIENE LA UBICACIÓN
-            window.location.href = `/?search=${document.getElementById('searchInput').value}&location=${currentLocation}`; 
+            // Mantenemos ubicación
+            window.location.href = /?search=${document.getElementById('searchInput').value}&location=${currentLocation}; 
         }
         
         document.getElementById('userMenuButton').addEventListener('click', (e) => { e.stopPropagation(); document.getElementById('dropdownMenu').classList.toggle('show'); });
