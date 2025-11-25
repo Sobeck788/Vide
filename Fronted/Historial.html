@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -16,6 +17,7 @@
             <div class="logo-section">
                 <a href="/" class="logo">VideITO</a>
             </div>
+            
             <div class="location-user-section">
                 <div class="user-menu" id="userMenuContainer" style="display: none;">
                     <button class="user-button" id="userMenuButton">
@@ -91,13 +93,17 @@
                                          .get();
 
                 if (snapshot.empty) { 
-                    container.innerHTML = '<div class="no-data">Tu historial está vacío.</div>'; 
+                    container.innerHTML = '<div class="no-data">No has visto ningún video aún.</div>'; 
                     return; 
                 }
                 
                 container.innerHTML = snapshot.docs.map(doc => {
                     const v = doc.data();
-                    let fecha = v.vistoPorUltimaVez && v.vistoPorUltimaVez.toDate ? v.vistoPorUltimaVez.toDate().toLocaleString() : 'Desconocida';
+                    let fecha = 'Fecha desconocida';
+                    // Verificación de seguridad por si la fecha falla
+                    if (v.vistoPorUltimaVez && v.vistoPorUltimaVez.toDate) {
+                        fecha = v.vistoPorUltimaVez.toDate().toLocaleString();
+                    }
 
                     return `<div class="video-item" onclick="window.location.href='/reproduccion?v=${v.videoId}'">
                         <div class="video-thumbnail" style="background-image: url('${v.thumbnail}')"><div class="play-overlay">▶</div></div>
@@ -106,6 +112,7 @@
                     </div>`;
                 }).join('');
             } catch (e) { 
+                console.error(e);
                 container.innerHTML = '<div class="no-data">Error cargando historial.</div>'; 
             }
         }
