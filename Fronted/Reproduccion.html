@@ -42,24 +42,25 @@
         <main class="video-player-container">
             <div class="player-section">
                 <div class="video-player" id="videoPlayer">
+                    <!-- EL REPRODUCTOR SE CARGARÁ AQUÍ -->
                     <div class="loading-player">Cargando video...</div>
                 </div>
                 <div class="video-info-detailed">
-                    <h1 class="video-title-detailed" id="videoTitle">Cargando...</h1>
-                    <div class="video-stats-detailed" id="videoStats">
+                    <h1 class="video-title-detailed" id="videoTitle">Cargando título...</h1>
+                    <div class="video-stats-detailed">
                         <span id="viewCount">0 vistas</span>
                         <span id="likeCount">0 likes</span>
-                        <span id="publishDate"></span>
+                        <span id="publishDate">Fecha no disponible</span>
                     </div>
                     <div class="channel-info">
                         <div class="channel-details">
-                            <div class="channel-name" id="channelName">Cargando...</div>
-                            <div class="subscriber-count" id="subscriberCount">Suscriptores</div>
+                            <div class="channel-name" id="channelName">Cargando canal...</div>
+                            <div class="subscriber-count">Suscriptores</div>
                         </div>
                         <button class="subscribe-btn" onclick="suscribirse()">Suscribirse</button>
                     </div>
                     <div class="video-description-detailed" id="videoDescription">
-                        Cargando descripción...
+                        Cargando descripción del video...
                     </div>
                 </div>
             </div>
@@ -71,14 +72,6 @@
             </div>
         </main>
     </div>
-
-    <!-- YouTube IFrame API -->
-    <script>
-        var tag = document.createElement('script');
-        tag.src = "https://www.youtube.com/iframe_api";
-        var firstScriptTag = document.getElementsByTagName('script')[0];
-        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-    </script>
 
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
@@ -130,15 +123,15 @@
         }
 
         // ===================================
-        // 3. REPRODUCCIÓN DE VIDEO (CORREGIDA)
+        // 3. REPRODUCCIÓN DE VIDEO (SIMPLIFICADA)
         // ===================================
-        let player;
-        let currentVideoInfo;
         let currentLocation = 'oaxaca';
 
-        function onYouTubeIframeAPIReady() {
+        document.addEventListener('DOMContentLoaded', function() {
             const params = new URLSearchParams(window.location.search);
             const videoId = params.get('v');
+            
+            console.log('🎬 Video ID recibido:', videoId);
             
             // RECUPERAR UBICACIÓN
             if (params.get('location')) {
@@ -147,193 +140,13 @@
             document.getElementById('currentLocation').textContent = currentLocation;
             
             if (videoId) {
-                cargarReproductor(videoId);
-                obtenerInfoYGuardar(videoId);
+                cargarVideo(videoId);
                 cargarSugerencias(currentLocation);
             } else {
-                document.getElementById('videoPlayer').innerHTML = 
-                    '<div class="error">Error: No se especificó video</div>';
+                mostrarError('No se especificó ningún video para reproducir');
             }
-        }
 
-        function cargarReproductor(videoId) {
-            const videoPlayer = document.getElementById('videoPlayer');
-            
-            // Verificar si es un video demo (no es un ID real de YouTube)
-            if (videoId.startsWith('vid_') || videoId.startsWith('demo_')) {
-                // Mostrar reproductor simulado para videos demo
-                videoPlayer.innerHTML = `
-                    <div style="width:100%; height:500px; background:#000; display:flex; flex-direction:column; align-items:center; justify-content:center; color:white; border-radius:10px;">
-                        <div style="font-size:48px; margin-bottom:20px;">🎬</div>
-                        <div style="font-size:24px; margin-bottom:10px;">Video Demo</div>
-                        <div style="font-size:16px; color:#ccc; margin-bottom:20px;">Reproducción simulada</div>
-                        <div style="display:flex; gap:10px;">
-                            <button onclick="controlarDemo('play')" style="padding:10px 20px; background:#ff6b6b; border:none; border-radius:5px; color:white; cursor:pointer;">▶ Reproducir</button>
-                            <button onclick="controlarDemo('pause')" style="padding:10px 20px; background:#666; border:none; border-radius:5px; color:white; cursor:pointer;">⏸ Pausar</button>
-                        </div>
-                        <div id="demoStatus" style="margin-top:20px; color:#ff6b6b;">Listo para reproducir</div>
-                    </div>
-                `;
-            } else {
-                // Es un video real de YouTube
-                player = new YT.Player('videoPlayer', {
-                    height: '500',
-                    width: '100%',
-                    videoId: videoId,
-                    playerVars: {
-                        'autoplay': 1,
-                        'controls': 1,
-                        'rel': 0,
-                        'modestbranding': 1
-                    },
-                    events: {
-                        'onReady': onPlayerReady,
-                        'onStateChange': onPlayerStateChange
-                    }
-                });
-            }
-        }
-
-        // Funciones para controlar video demo
-        function controlarDemo(accion) {
-            const status = document.getElementById('demoStatus');
-            if (accion === 'play') {
-                status.textContent = '▶ Reproduciendo...';
-                status.style.color = '#4ecdc4';
-            } else if (accion === 'pause') {
-                status.textContent = '⏸ Pausado';
-                status.style.color = '#ff6b6b';
-            }
-        }
-
-        function onPlayerReady(event) {
-            console.log('✅ Reproductor listo');
-        }
-
-        function onPlayerStateChange(event) {
-            // Puedes agregar lógica adicional aquí si lo necesitas
-        }
-
-        async function obtenerInfoYGuardar(videoId) {
-            try {
-                const user = auth.currentUser;
-                const sessionId = user ? user.uid : 'anonymous';
-                
-                const res = await fetch(`/api/video-info?v=${videoId}&sessionId=${sessionId}`);
-                const data = await res.json();
-                
-                if (data.success) {
-                    currentVideoInfo = data.video;
-                    mostrarDetalles(data.video);
-                    guardarEnHistorial(data.video); 
-                } else {
-                    throw new Error("No se pudo obtener información del video");
-                }
-            } catch(error) {
-                console.error('Error obteniendo info del video:', error);
-                // Mostrar información demo como fallback
-                const demoInfo = { 
-                    id: videoId, 
-                    title: videoId.startsWith('vid_') ? "Video Demo - Contenido Local" : "Video de YouTube",
-                    channelTitle: "Canal Demo",
-                    description: videoId.startsWith('vid_') 
-                        ? "Este es un video de demostración con contenido simulado para la ubicación seleccionada."
-                        : "Descripción no disponible en este momento.",
-                    viewCount: '15,420',
-                    likeCount: '843',
-                    publishedAt: new Date().toISOString(),
-                    thumbnail: `https://via.placeholder.com/320x180/ff6b6b/white?text=Video+${videoId.substring(0,6)}`
-                };
-                mostrarDetalles(demoInfo);
-                guardarEnHistorial(demoInfo);
-            }
-        }
-
-        async function guardarEnHistorial(videoInfo) {
-            const user = auth.currentUser;
-            if (!user) return;
-            
-            try {
-                await db.collection('usuarios').doc(user.uid).collection('historial').doc(videoInfo.id).set({
-                    videoId: videoInfo.id,
-                    title: videoInfo.title,
-                    channelTitle: videoInfo.channelTitle,
-                    thumbnail: videoInfo.thumbnail,
-                    vistoPorUltimaVez: firebase.firestore.FieldValue.serverTimestamp()
-                }, { merge: true });
-                
-                console.log('✅ Guardado en historial:', videoInfo.title);
-            } catch (error) {
-                console.error('Error guardando en historial:', error);
-            }
-        }
-
-        function mostrarDetalles(video) {
-            document.getElementById('videoTitle').textContent = video.title;
-            document.getElementById('channelName').textContent = video.channelTitle;
-            document.getElementById('videoDescription').textContent = video.description;
-            document.getElementById('viewCount').textContent = video.viewCount + ' vistas';
-            document.getElementById('likeCount').textContent = video.likeCount + ' likes';
-            
-            // Formatear fecha de publicación
-            try {
-                const fecha = new Date(video.publishedAt);
-                document.getElementById('publishDate').textContent = 'Publicado: ' + fecha.toLocaleDateString('es-MX');
-            } catch (e) {
-                document.getElementById('publishDate').textContent = 'Publicado: Recientemente';
-            }
-        }
-
-        async function cargarSugerencias(location) {
-            try {
-                const user = auth.currentUser;
-                const sessionId = user ? user.uid : 'anonymous';
-                
-                const res = await fetch(`/api/videos?location=${location}&sessionId=${sessionId}`);
-                const data = await res.json();
-                
-                if (data.videos && data.videos.length > 0) {
-                    const suggestionsList = document.getElementById('suggestionsList');
-                    // Filtrar el video actual de las sugerencias
-                    const currentVideoId = new URLSearchParams(window.location.search).get('v');
-                    const videosSugeridos = data.videos.filter(v => v.id !== currentVideoId).slice(0, 5);
-                    
-                    suggestionsList.innerHTML = videosSugeridos.map(video => `
-                        <div class="suggestion-item" onclick="window.location.href='/reproduccion?v=${video.id}&location=${location}'">
-                            <div class="suggestion-thumbnail" style="background-image: url('${video.thumbnail}')"></div>
-                            <div class="suggestion-info">
-                                <div class="suggestion-title">${video.title}</div>
-                                <div class="suggestion-channel">${video.channelTitle}</div>
-                                <div class="suggestion-views">${video.viewCount} vistas</div>
-                            </div>
-                        </div>
-                    `).join('');
-                } else {
-                    document.getElementById('suggestionsList').innerHTML = 
-                        '<div class="error">No hay sugerencias disponibles</div>';
-                }
-            } catch(error) {
-                console.error('Error cargando sugerencias:', error);
-                document.getElementById('suggestionsList').innerHTML = 
-                    '<div class="error">Error cargando sugerencias</div>';
-            }
-        }
-
-        function suscribirse() {
-            alert('¡Te has suscrito al canal!');
-        }
-
-        function buscarVideos() {
-            const search = document.getElementById('searchInput').value.trim();
-            if (search) {
-                window.location.href = `/?search=${encodeURIComponent(search)}&location=${currentLocation}`;
-            } else {
-                window.location.href = `/?location=${currentLocation}`;
-            }
-        }
-
-        // Eventos del menú de usuario
-        document.addEventListener('DOMContentLoaded', function() {
+            // Eventos del menú
             const userMenuButton = document.getElementById('userMenuButton');
             const dropdownMenu = document.getElementById('dropdownMenu');
             
@@ -353,6 +166,194 @@
                 if (e.key === 'Enter') buscarVideos();
             });
         });
+
+        function cargarVideo(videoId) {
+            const videoPlayer = document.getElementById('videoPlayer');
+            
+            console.log('🔧 Cargando video:', videoId);
+            
+            // Verificar si es un video real de YouTube o un demo
+            if (videoId.startsWith('vid_') || videoId.length !== 11) {
+                // VIDEO DEMO - Mostrar reproductor simulado
+                videoPlayer.innerHTML = `
+                    <div style="width:100%; height:500px; background:#000; display:flex; flex-direction:column; align-items:center; justify-content:center; color:white; border-radius:10px; position:relative;">
+                        <div style="font-size:48px; margin-bottom:20px;">🎬</div>
+                        <div style="font-size:24px; margin-bottom:10px; text-align:center;">Video Demo</div>
+                        <div style="font-size:16px; color:#ccc; margin-bottom:30px; text-align:center;">Contenido de ${currentLocation}</div>
+                        <div style="display:flex; gap:15px; margin-bottom:20px;">
+                            <button onclick="controlarDemo('play')" style="padding:12px 24px; background:#ff6b6b; border:none; border-radius:8px; color:white; cursor:pointer; font-weight:bold;">▶ Reproducir</button>
+                            <button onclick="controlarDemo('pause')" style="padding:12px 24px; background:#666; border:none; border-radius:8px; color:white; cursor:pointer; font-weight:bold;">⏸ Pausar</button>
+                        </div>
+                        <div id="demoStatus" style="color:#4ecdc4; font-size:14px;">Presiona Reproducir para comenzar</div>
+                        <div style="position:absolute; bottom:15px; right:15px; background:rgba(0,0,0,0.7); padding:5px 10px; border-radius:5px; font-size:12px;">DEMO</div>
+                    </div>
+                `;
+            } else {
+                // VIDEO REAL DE YOUTUBE - Usar iframe directo (MÁS SIMPLE)
+                videoPlayer.innerHTML = `
+                    <iframe 
+                        width="100%" 
+                        height="500" 
+                        src="https://www.youtube.com/embed/${videoId}?autoplay=1&controls=1&rel=0" 
+                        frameborder="0" 
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                        allowfullscreen
+                        style="border-radius:10px;"
+                    ></iframe>
+                `;
+                console.log('✅ Iframe de YouTube cargado');
+            }
+            
+            // Cargar información del video
+            obtenerInfoVideo(videoId);
+        }
+
+        function controlarDemo(accion) {
+            const status = document.getElementById('demoStatus');
+            if (accion === 'play') {
+                status.textContent = '▶ Reproduciendo contenido de ' + currentLocation;
+                status.style.color = '#4ecdc4';
+            } else if (accion === 'pause') {
+                status.textContent = '⏸ Video pausado';
+                status.style.color = '#ff6b6b';
+            }
+        }
+
+        async function obtenerInfoVideo(videoId) {
+            try {
+                const user = auth.currentUser;
+                const sessionId = user ? user.uid : 'anonymous';
+                
+                console.log('📡 Obteniendo información del video...');
+                
+                const res = await fetch(`/api/video-info?v=${videoId}&sessionId=${sessionId}`);
+                const data = await res.json();
+                
+                if (data.success) {
+                    console.log('✅ Información del video obtenida');
+                    mostrarDetallesVideo(data.video);
+                    guardarEnHistorial(data.video);
+                } else {
+                    throw new Error("No se pudo obtener información del video");
+                }
+            } catch (error) {
+                console.error('Error cargando información:', error);
+                // Información por defecto si falla la API
+                mostrarDetallesVideo({
+                    id: videoId,
+                    title: videoId.startsWith('vid_') ? `Video de ${currentLocation} - Demo` : 'Video de YouTube',
+                    channelTitle: videoId.startsWith('vid_') ? 'Canal Local' : 'Canal de YouTube',
+                    description: videoId.startsWith('vid_') 
+                        ? `Este es un video demostrativo de contenido local de ${currentLocation}. En una implementación real, se mostrarían videos reales de esta ubicación.`
+                        : 'Descripción del video no disponible en este momento.',
+                    viewCount: '15,420',
+                    likeCount: '843',
+                    publishedAt: new Date().toISOString()
+                });
+            }
+        }
+
+        function mostrarDetallesVideo(video) {
+            document.getElementById('videoTitle').textContent = video.title;
+            document.getElementById('channelName').textContent = video.channelTitle;
+            document.getElementById('videoDescription').textContent = video.description;
+            document.getElementById('viewCount').textContent = video.viewCount + ' vistas';
+            document.getElementById('likeCount').textContent = video.likeCount + ' likes';
+            
+            try {
+                const fecha = new Date(video.publishedAt);
+                document.getElementById('publishDate').textContent = 'Publicado: ' + fecha.toLocaleDateString('es-MX');
+            } catch (e) {
+                document.getElementById('publishDate').textContent = 'Publicado: Recientemente';
+            }
+        }
+
+        async function guardarEnHistorial(videoInfo) {
+            const user = auth.currentUser;
+            if (!user) {
+                console.log('⚠️ Usuario no logueado, no se guarda en historial');
+                return;
+            }
+            
+            try {
+                await db.collection('usuarios').doc(user.uid).collection('historial').doc(videoInfo.id).set({
+                    videoId: videoInfo.id,
+                    title: videoInfo.title,
+                    channelTitle: videoInfo.channelTitle,
+                    thumbnail: videoInfo.thumbnail || '',
+                    vistoPorUltimaVez: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+                console.log('✅ Guardado en historial de Firestore');
+            } catch (error) {
+                console.error('Error guardando en historial:', error);
+            }
+        }
+
+        async function cargarSugerencias(location) {
+            try {
+                const user = auth.currentUser;
+                const sessionId = user ? user.uid : 'anonymous';
+                const currentVideoId = new URLSearchParams(window.location.search).get('v');
+                
+                console.log('🔍 Cargando sugerencias para:', location);
+                
+                const res = await fetch(`/api/videos?location=${location}&sessionId=${sessionId}`);
+                const data = await res.json();
+                
+                if (data.videos && data.videos.length > 0) {
+                    const suggestionsList = document.getElementById('suggestionsList');
+                    // Filtrar el video actual y tomar máximo 5 sugerencias
+                    const videosSugeridos = data.videos
+                        .filter(v => v.id !== currentVideoId)
+                        .slice(0, 5);
+                    
+                    if (videosSugeridos.length > 0) {
+                        suggestionsList.innerHTML = videosSugeridos.map(video => `
+                            <div class="suggestion-item" onclick="irAVideo('${video.id}')">
+                                <div class="suggestion-thumbnail" style="background-image: url('${video.thumbnail}')"></div>
+                                <div class="suggestion-info">
+                                    <div class="suggestion-title">${video.title}</div>
+                                    <div class="suggestion-channel">${video.channelTitle}</div>
+                                    <div class="suggestion-views">${video.viewCount} vistas</div>
+                                </div>
+                            </div>
+                        `).join('');
+                        console.log('✅ Sugerencias cargadas:', videosSugeridos.length);
+                    } else {
+                        suggestionsList.innerHTML = '<div class="no-data">No hay más videos sugeridos</div>';
+                    }
+                } else {
+                    document.getElementById('suggestionsList').innerHTML = 
+                        '<div class="no-data">No hay sugerencias disponibles</div>';
+                }
+            } catch(error) {
+                console.error('Error cargando sugerencias:', error);
+                document.getElementById('suggestionsList').innerHTML = 
+                    '<div class="error">Error cargando sugerencias</div>';
+            }
+        }
+
+        function irAVideo(videoId) {
+            window.location.href = `/reproduccion?v=${videoId}&location=${currentLocation}`;
+        }
+
+        function suscribirse() {
+            alert('¡Te has suscrito al canal!');
+        }
+
+        function buscarVideos() {
+            const search = document.getElementById('searchInput').value.trim();
+            if (search) {
+                window.location.href = `/?search=${encodeURIComponent(search)}&location=${currentLocation}`;
+            } else {
+                window.location.href = `/?location=${currentLocation}`;
+            }
+        }
+
+        function mostrarError(mensaje) {
+            document.getElementById('videoPlayer').innerHTML = 
+                `<div class="error">${mensaje}</div>`;
+        }
     </script>
 </body>
 </html>
