@@ -19,10 +19,11 @@
             
             <div class="location-user-section">
                 <div class="user-location" id="locationDisplay">
-                    <span id="currentLocation">Oaxaca</span>
-                    <button onclick="cambiarUbicacion()" class="location-change-btn" style="padding: 2px 8px; font-size: 0.8rem; margin-left: 5px;">Cambiar</button>
+                    Tu ubicación: <span id="currentLocation">Oaxaca</span>
+                    <button onclick="cambiarUbicacion()" class="location-change-btn">Cambiar</button>
                 </div>
                 
+                <!-- MENÚ DE USUARIO -->
                 <div class="user-menu" id="userMenuContainer" style="display: none;">
                     <button class="user-button" id="userMenuButton">
                         <div class="user-authenticated">
@@ -36,14 +37,25 @@
                         <button class="dropdown-item" onclick="cerrarSesion()">Salir</button>
                     </div>
                 </div>
-                <div id="loginContainer" style="display: block;">
-                    <button class="login-button" onclick="iniciarSesionGoogle()">Iniciar Sesión</button>
+                
+                <!-- BOTÓN DE LOGIN -->
+                <div id="loginContainer">
+                    <button class="login-button" onclick="iniciarSesionGoogle()">Iniciar Sesión con Google</button>
                 </div>
             </div>
         </header>
 
         <section class="filters">
-            <div class="location-info" id="locationInfo">Cargando...</div>
+            <div class="sort-filter">
+                <select id="sortSelect" onchange="cambiarOrden()">
+                    <option value="relevance">Ordenar por: Relevancia</option>
+                    <option value="date">Fecha</option>
+                    <option value="viewCount">Vistas</option>
+                </select>
+            </div>
+            <div class="location-info" id="locationInfo">
+                Cargando videos para tu ubicación...
+            </div>
         </section>
 
         <section class="video-list" id="videoList">
@@ -51,11 +63,13 @@
         </section>
     </div>
 
+    <!-- SDKs de Firebase -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
 
     <script>
+        // TU CONFIGURACIÓN EXACTA
         const firebaseConfig = {
           apiKey: "AIzaSyDYT4mQRUmZXhu1GwYJbcavtQYzr0eHeu0",
           authDomain: "videito-c89a2.firebaseapp.com",
@@ -65,110 +79,151 @@
           appId: "1:587797165631:web:3d9f16e83cf57497d46a8a",
           measurementId: "G-H837KE6W6K"
         };
+
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
 
-        // AUTH
+        // 2. LÓGICA DE AUTENTICACIÓN
         auth.onAuthStateChanged((user) => {
             if (user) {
-                document.getElementById('userMenuContainer').style.display = 'block';
-                document.getElementById('loginContainer').style.display = 'none';
-                document.getElementById('userName').textContent = user.displayName;
-                document.getElementById('userAvatarHeader').style.backgroundImage = url(${user.photoURL});
-                db.collection('usuarios').doc(user.uid).set({
-                    uid: user.uid, nombre: user.displayName, email: user.email, foto: user.photoURL
-                }, { merge: true });
+                actualizarUIUsuario(user);
+                guardarUsuarioEnDB(user); // Aseguramos que se guarde al recargar
             } else {
-                document.getElementById('userMenuContainer').style.display = 'none';
-                document.getElementById('loginContainer').style.display = 'block';
+                actualizarUIInvitado();
             }
         });
 
+        function actualizarUIUsuario(user) {
+            document.getElementById('userMenuContainer').style.display = 'block';
+            document.getElementById('loginContainer').style.display = 'none';
+            document.getElementById('userName').textContent = user.displayName;
+            document.getElementById('userAvatarHeader').style.backgroundImage = url(${user.photoURL});
+        }
+
+        function actualizarUIInvitado() {
+            document.getElementById('userMenuContainer').style.display = 'none';
+            document.getElementById('loginContainer').style.display = 'block';
+        }
+
         function iniciarSesionGoogle() {
             const provider = new firebase.auth.GoogleAuthProvider();
-            auth.signInWithPopup(provider).catch(e => alert(e.message));
+            auth.signInWithPopup(provider).catch((error) => alert('Error: ' + error.message));
         }
-        function cerrarSesion() { auth.signOut().then(() => window.location.reload()); }
 
-        // LÓGICA DE VIDEOS
-        let currentLocation = 'Oaxaca'; 
+        function guardarUsuarioEnDB(user) {
+            const userRef = db.collection('usuarios').doc(user.uid);
+            userRef.set({
+                uid: user.uid,
+                nombre: user.displayName,
+                email: user.email,
+                foto: user.photoURL,
+                ultimo_acceso: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+        }
 
-        document.addEventListener('DOMContentLoaded', () => {
+        function cerrarSesion() {
+            if (confirm('¿Cerrar sesión?')) {
+                auth.signOut().then(() => window.location.reload());
+            }
+        }
+
+        // 3. LÓGICA DE VIDEOS
+        let currentLocation = 'Oaxaca';
+        let currentSearch = '';
+
+        document.addEventListener('DOMContentLoaded', function() {
             const urlParams = new URLSearchParams(window.location.search);
             
-            // 1. LEER UBICACIÓN DE URL (Esto evita que regrese a Oaxaca)
+            // RECUPERAR UBICACIÓN DE LA URL (¡Para que no se olvide!)
             if (urlParams.get('location')) {
                 currentLocation = urlParams.get('location');
             }
             document.getElementById('currentLocation').textContent = currentLocation;
 
-            const searchParam = urlParams.get('search') || '';
-            if (searchParam) document.getElementById('searchInput').value = searchParam;
+            const searchParam = urlParams.get('search');
+            if (searchParam) {
+                document.getElementById('searchInput').value = searchParam;
+                currentSearch = searchParam;
+            }
+            cargarVideos(currentSearch);
             
-            cargarVideos(searchParam);
-
-            document.getElementById('searchInput').addEventListener('keypress', (e) => {
+            document.getElementById('searchInput').addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') buscarVideos();
             });
-            
-            document.getElementById('userMenuButton').addEventListener('click', (e) => {
-                e.stopPropagation(); document.getElementById('dropdownMenu').classList.toggle('show');
-            });
-            window.addEventListener('click', () => document.getElementById('dropdownMenu').classList.remove('show'));
+
+            const userMenuButton = document.getElementById('userMenuButton');
+            const dropdownMenu = document.getElementById('dropdownMenu');
+            if (userMenuButton) {
+                userMenuButton.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    dropdownMenu.classList.toggle('show');
+                });
+            }
+            window.addEventListener('click', () => dropdownMenu.classList.remove('show'));
         });
 
-        async function cargarVideos(query) {
+        async function cargarVideos(searchQuery = '') {
             const videoList = document.getElementById('videoList');
-            videoList.innerHTML = '<div class="loading">Cargando...</div>';
-            document.getElementById('locationInfo').textContent = Buscando en ${currentLocation}...;
-
+            videoList.innerHTML = '<div class="loading">Cargando videos...</div>';
+            
             try {
-                const res = await fetch(/api/videos?location=${currentLocation}&search=${encodeURIComponent(query)});
-                if(!res.ok) throw new Error('Error Backend');
-                const data = await res.json();
-                
-                if(data && data.length > 0) { // El backend devuelve un array directo
-                    mostrarVideos(data);
-                    document.getElementById('locationInfo').textContent = Resultados en ${currentLocation};
+                const response = await fetch(/api/videos?location=${currentLocation}&search=${encodeURIComponent(searchQuery)});
+                const data = await response.json();
+
+                // El backend puede devolver array directo o objeto {videos: []}
+                const videos = Array.isArray(data) ? data : data.videos;
+
+                if (videos && videos.length > 0) { 
+                    mostrarVideos(videos);
+                    document.getElementById('locationInfo').textContent = 
+                        Videos en ${currentLocation}${searchQuery ? ` - "${searchQuery}" : ''}`;
                 } else {
-                    throw new Error('Sin resultados');
+                    videoList.innerHTML = '<div class="error">No se encontraron videos.</div>';
                 }
-            } catch (e) {
-                console.warn("Error:", e);
-                document.getElementById('videoList').innerHTML = '<div class="error">No se encontraron videos o falta API Key.</div>';
+            } catch (error) {
+                console.warn('Error cargando videos:', error);
+                videoList.innerHTML = '<div class="error">Error de conexión o API Key faltante en Render.</div>';
             }
         }
 
         function mostrarVideos(videos) {
-            document.getElementById('videoList').innerHTML = videos.map(v => `
+            const videoList = document.getElementById('videoList');
+            videoList.innerHTML = videos.map(video => `
                 <div class="video-item">
-                    <div class="video-thumbnail" style="background-image: url('${v.thumbnail}')" onclick="reproducirVideo('${v.id}')">
+                    <div class="video-thumbnail" style="background-image: url('${video.thumbnail}')" onclick="reproducirVideo('${video.id}')">
                         <div class="play-overlay">▶</div>
                     </div>
                     <div class="video-info">
-                        <div class="video-title">${v.title}</div>
-                        <div class="video-channel">${v.channelTitle}</div>
+                        <div class="video-title">${video.title}</div>
+                        <div class="video-channel">${video.channelTitle}</div>
+                        <div class="video-stats">${formatearFecha(video.publishedAt)}</div>
                     </div>
-                </div>`).join('');
+                </div>
+            `).join('');
         }
 
         function reproducirVideo(videoId) {
+            // PASAMOS LA UBICACIÓN para no perderla
             window.location.href = /reproduccion?v=${videoId}&location=${currentLocation};
         }
 
-        // 2. CORRECCIÓN DE BÚSQUEDA: INCLUIR LOCATION
         function buscarVideos() {
             const search = document.getElementById('searchInput').value.trim();
+            // PASAMOS LA UBICACIÓN AQUÍ TAMBIÉN
             window.location.href = /?search=${encodeURIComponent(search)}&location=${currentLocation};
         }
 
         function cambiarUbicacion() {
-            const nueva = prompt('Nueva ubicación (ej: Japon, España, Puebla):', currentLocation);
-            if(nueva) {
-                window.location.href = /?location=${nueva}; 
+            const nueva = prompt('Nueva ubicación (ej: Japon, España):', currentLocation);
+            if (nueva) {
+                // Recargamos limpio con la nueva ubicación
+                window.location.href = /?location=${nueva};
             }
         }
+
+        function cambiarOrden() { alert('Próximamente'); }
+        function formatearFecha(fecha) { return new Date(fecha).toLocaleDateString('es-MX'); }
     </script>
 </body>
 </html>
