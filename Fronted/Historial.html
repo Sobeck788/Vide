@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="Stilos.css">
     <style>
         .page-title { padding: 20px; font-size: 24px; color: #333; }
-        .no-data { padding: 20px; text-align: center; color: #666; }
+        .no-data { padding: 40px; text-align: center; color: #666; font-size: 1.2em; }
     </style>
 </head>
 <body>
@@ -16,9 +16,7 @@
             <div class="logo-section">
                 <a href="/" class="logo">VideITO</a>
             </div>
-            
             <div class="location-user-section">
-                <!-- MENÚ DE USUARIO -->
                 <div class="user-menu" id="userMenuContainer" style="display: none;">
                     <button class="user-button" id="userMenuButton">
                         <div class="user-authenticated">
@@ -32,8 +30,7 @@
                         <button class="dropdown-item" onclick="cerrarSesion()">Salir</button>
                     </div>
                 </div>
-                <!-- LOGIN -->
-                <div id="loginContainer">
+                <div id="loginContainer" style="display: block;">
                     <button class="login-button" onclick="iniciarSesionGoogle()">Iniciar Sesión</button>
                 </div>
             </div>
@@ -42,18 +39,16 @@
         <main>
             <h1 class="page-title">Historial de Reproducción</h1>
             <section class="video-list" id="historialContainer">
-                <div class="loading">Verificando sesión...</div>
+                <div class="loading">Cargando...</div>
             </section>
         </main>
     </div>
 
-    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
 
     <script>
-        // 1. CONFIGURACIÓN FIREBASE
         const firebaseConfig = {
           apiKey: "AIzaSyDYT4mQRUmZXhu1GwYJbcavtQYzr0eHeu0",
           authDomain: "videito-c89a2.firebaseapp.com",
@@ -63,90 +58,61 @@
           appId: "1:587797165631:web:3d9f16e83cf57497d46a8a",
           measurementId: "G-H837KE6W6K"
         };
-
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
 
-        // 2. AUTH LOGIC
         auth.onAuthStateChanged((user) => {
             if (user) {
-                // UI Logueado
                 document.getElementById('userMenuContainer').style.display = 'block';
                 document.getElementById('loginContainer').style.display = 'none';
                 document.getElementById('userName').textContent = user.displayName;
-                document.getElementById('userAvatarHeader').style.backgroundImage = `url(${user.photoURL})`;
-                
-                // CARGAR HISTORIAL
+                document.getElementById('userAvatarHeader').style.backgroundImage = url(${user.photoURL});
                 cargarHistorial(user.uid);
             } else {
-                // UI Invitado
                 document.getElementById('userMenuContainer').style.display = 'none';
                 document.getElementById('loginContainer').style.display = 'block';
-                document.getElementById('historialContainer').innerHTML = 
-                    '<div class="no-data">Inicia sesión para ver tu historial.</div>';
+                document.getElementById('historialContainer').innerHTML = '<div class="no-data">Inicia sesión para ver tu historial.</div>';
             }
         });
 
         function iniciarSesionGoogle() {
             const provider = new firebase.auth.GoogleAuthProvider();
-            auth.signInWithPopup(provider);
+            auth.signInWithPopup(provider).catch(e => alert(e.message));
         }
+        function cerrarSesion() { auth.signOut().then(() => window.location.href = '/'); }
 
-        function cerrarSesion() {
-            auth.signOut().then(() => window.location.href = '/');
-        }
-
-        // 3. LÓGICA DE HISTORIAL (Lectura)
         async function cargarHistorial(uid) {
             const container = document.getElementById('historialContainer');
-            container.innerHTML = '<div class="loading">Cargando historial...</div>';
-
             try {
-                // Leer subcolección historial ordenada por fecha
                 const snapshot = await db.collection('usuarios').doc(uid)
                                          .collection('historial')
                                          .orderBy('vistoPorUltimaVez', 'desc')
                                          .get();
 
-                if (snapshot.empty) {
-                    container.innerHTML = '<div class="no-data">No has visto ningún video aún.</div>';
-                    return;
+                if (snapshot.empty) { 
+                    container.innerHTML = '<div class="no-data">Tu historial está vacío.</div>'; 
+                    return; 
                 }
-
-                let html = '';
-                snapshot.forEach(doc => {
+                
+                container.innerHTML = snapshot.docs.map(doc => {
                     const v = doc.data();
-                    // Formatear fecha (si existe)
-                    let fecha = 'Recientemente';
-                    if (v.vistoPorUltimaVez) {
-                        fecha = v.vistoPorUltimaVez.toDate().toLocaleString();
-                    }
+                    let fecha = v.vistoPorUltimaVez && v.vistoPorUltimaVez.toDate ? v.vistoPorUltimaVez.toDate().toLocaleString() : 'Desconocida';
 
-                    html += `
-                        <div class="video-item" onclick="window.location.href='/reproduccion?v=${v.videoId}'">
-                            <div class="video-thumbnail" style="background-image: url('${v.thumbnail}')">
-                                <div class="play-overlay">▶</div>
-                            </div>
-                            <div class="video-info">
-                                <div class="video-title">${v.title}</div>
-                                <div class="video-channel">${v.channelTitle}</div>
-                                <div class="video-stats">Visto: ${fecha}</div>
-                            </div>
-                        </div>
-                    `;
-                });
-                container.innerHTML = html;
-
-            } catch (error) {
-                console.error(error);
-                container.innerHTML = '<div class="no-data">Error al cargar historial.</div>';
+                    return `<div class="video-item" onclick="window.location.href='/reproduccion?v=${v.videoId}'">
+                        <div class="video-thumbnail" style="background-image: url('${v.thumbnail}')"><div class="play-overlay">▶</div></div>
+                        <div class="video-info"><div class="video-title">${v.title}</div><div class="video-channel">${v.channelTitle}</div>
+                        <div class="video-stats">Visto: ${fecha}</div></div>
+                    </div>`;
+                }).join('');
+            } catch (e) { 
+                container.innerHTML = '<div class="no-data">Error cargando historial.</div>'; 
             }
         }
 
-        // Menú
         const btn = document.getElementById('userMenuButton');
         if(btn) btn.addEventListener('click', () => document.getElementById('dropdownMenu').classList.toggle('show'));
+        window.addEventListener('click', (e) => { if (!e.target.closest('.user-button')) document.getElementById('dropdownMenu').classList.remove('show'); });
     </script>
 </body>
 </html>
