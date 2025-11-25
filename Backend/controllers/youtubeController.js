@@ -1,4 +1,3 @@
-
 const axios = require('axios');
 
 class YouTubeController {
@@ -14,18 +13,16 @@ class YouTubeController {
             'oaxaca': { lat: 17.0732, lng: -96.7266, radius: '50km' },
             'ciudad de mexico': { lat: 19.4326, lng: -99.1332, radius: '50km' },
             'cdmx': { lat: 19.4326, lng: -99.1332, radius: '50km' },
-            'mexico city': { lat: 19.4326, lng: -99.1332, radius: '50km' },
-            'guadalajara': { lat: 20.6597, lng: -103.3496, radius: '50km' },
-            'monterrey': { lat: 25.6866, lng: -100.3161, radius: '50km' },
             'puebla': { lat: 19.0414, lng: -98.2063, radius: '50km' },
+            'monterrey': { lat: 25.6866, lng: -100.3161, radius: '50km' },
+            'guadalajara': { lat: 20.6597, lng: -103.3496, radius: '50km' },
             
-            // Países
+            // Mundo
+            'japon': { lat: 36.2048, lng: 138.2529, radius: '500km' },
+            'tokio': { lat: 35.6762, lng: 139.6503, radius: '100km' },
             'china': { lat: 35.8617, lng: 104.1954, radius: '1000km' },
-            'estados unidos': { lat: 37.0902, lng: -95.7129, radius: '1000km' },
-            'usa': { lat: 37.0902, lng: -95.7129, radius: '1000km' },
             'españa': { lat: 40.4637, lng: -3.7492, radius: '500km' },
-            'japón': { lat: 36.2048, lng: 138.2529, radius: '500km' },
-            'japon': { lat: 36.2048, lng: 138.2529, radius: '500km' }, // Sin acento
+            'usa': { lat: 37.0902, lng: -95.7129, radius: '1000km' },
             'argentina': { lat: -38.4161, lng: -63.6167, radius: '1000km' },
             'brasil': { lat: -14.2350, lng: -51.9253, radius: '1000km' }
         };
@@ -38,20 +35,15 @@ class YouTubeController {
         try {
             console.log(🎬 Buscando: "${location}" - "${searchQuery}");
 
-            const hasValidAPIKey = this.apiKey && this.apiKey !== 'tu_api_key_de_youtube_aqui';
-            
-            if (!hasValidAPIKey) {
-                console.log('📹 Usando datos de ejemplo (Falta API Key)');
+            // Validación de API Key
+            if (!this.apiKey || this.apiKey === 'tu_api_key_de_youtube_aqui') {
+                console.log('⚠️ Sin API Key: Enviando Mock Data');
                 return this.getMockVideos(location, searchQuery, maxResults);
             }
 
-            console.log('🔑 Usando API Key real de YouTube');
             const locationCoords = this.getLocationCoordinates(location);
             
-            // === AQUÍ ESTÁ EL CAMBIO CLAVE PARA LA BÚSQUEDA ===
-            // Si hay algo escrito, buscamos SOLO eso (ej: "Yoga"). 
-            // Si no hay nada escrito, buscamos algo genérico ("vlog") + el lugar para rellenar.
-            // NO concatenamos el lugar si ya hay búsqueda, porque eso ensucia los resultados.
+            // Estrategia de búsqueda limpia
             let q = searchQuery ? searchQuery : vlog ${location};
 
             const params = {
@@ -60,29 +52,25 @@ class YouTubeController {
                 maxResults: maxResults,
                 key: this.apiKey,
                 q: q,
-                // El filtro real lo hacen estas coordenadas:
                 location: ${locationCoords.lat},${locationCoords.lng},
                 locationRadius: locationCoords.radius
             };
 
-            const response = await axios.get(${this.baseURL}/search, { 
-                params,
-                timeout: 10000
-            });
+            const response = await axios.get(${this.baseURL}/search, { params });
             
             if (response.data.items && response.data.items.length > 0) {
-                console.log(✅ Encontrados ${response.data.items.length} videos reales);
                 return this.formatVideos(response.data.items);
-            } else {
-                return this.getMockVideos(location, searchQuery, maxResults);
             }
+            // Si YouTube no devuelve nada, mandamos Mocks en lugar de vacío
+            return this.getMockVideos(location, searchQuery, maxResults);
+
         } catch (error) {
-            console.error('❌ Error en búsqueda:', error.message);
+            console.error('❌ Error Controller:', error.message);
+            // En caso de error, SIEMPRE devolvemos array (Mocks) para no romper el front
             return this.getMockVideos(location, searchQuery, maxResults);
         }
     }
 
-    // Agregué este método porque Reproduccion.html lo necesita para cargar un solo video
     async getVideoDetails(videoId) {
          try {
             if (!this.apiKey) return null;
@@ -115,34 +103,25 @@ class YouTubeController {
             channelTitle: video.snippet.channelTitle,
             publishedAt: video.snippet.publishedAt,
             thumbnail: video.snippet.thumbnails.medium.url,
-            liveBroadcastContent: video.snippet.liveBroadcastContent,
-            viewCount: Math.floor(Math.random() * 1000000).toString(),
-            likeCount: Math.floor(Math.random() * 50000).toString()
+            viewCount: '1M', // Placeholder si search no da vistas
+            likeCount: '50K'
         }));
     }
 
     getMockVideos(location, searchQuery, maxResults = 10) {
-        console.log(🎭 Generando ${maxResults} videos de ejemplo);
-        const baseVideos = [
-            {
-                id: 'tUrVwCBPUpY',
-                title: Video Demo en ${location}: ${searchQuery || 'General'},
-                description: Descripción de prueba para ${location},
+        const mocks = [];
+        for(let i=0; i<maxResults; i++) {
+            mocks.push({
+                id: demo_${i},
+                title: Video Demo ${location} ${searchQuery} #${i+1},
+                description: "Este es un video de prueba.",
                 channelTitle: Canal ${location},
                 publishedAt: new Date().toISOString(),
-                thumbnail: https://via.placeholder.com/320x180/ff6b6b/white?text=${encodeURIComponent(location)},
-                viewCount: '15420', likeCount: '843'
-            }
-        ];
-        // Rellenar hasta maxResults
-        while (baseVideos.length < maxResults) {
-            baseVideos.push({
-                ...baseVideos[0],
-                id: 'demo_' + Math.random().toString(36).substr(2, 9),
-                title: Video Demo #${baseVideos.length + 1}
+                thumbnail: https://picsum.photos/seed/${location}${i}/320/180,
+                viewCount: '1000', likeCount: '100'
             });
         }
-        return baseVideos.slice(0, maxResults);
+        return mocks;
     }
 }
 
