@@ -25,7 +25,8 @@ class YouTubeController {
             'españa': { lat: 40.4637, lng: -3.7492, radius: '500km' },
             'japón': { lat: 36.2048, lng: 138.2529, radius: '500km' },
             'argentina': { lat: -38.4161, lng: -63.6167, radius: '1000km' },
-            'brasil': { lat: -14.2350, lng: -51.9253, radius: '1000km' }
+            'brasil': { lat: -14.2350, lng: -51.9253, radius: '1000km' },
+            'global': { lat: 0, lng: 0, radius: '50000km' }
         };
 
         const normalizedLocation = locationName.toLowerCase().trim();
@@ -45,24 +46,37 @@ class YouTubeController {
             }
 
             console.log('🔑 Usando API Key real de YouTube');
-            const locationCoords = this.getLocationCoordinates(location);
             
-            const params = {
+            let params = {
                 part: 'snippet',
                 type: 'video',
                 maxResults: maxResults,
-                key: this.apiKey,
-                // FIX: Usar solo el searchQuery si está presente, o el location.
-                // Esto evita mezclar el término de búsqueda con el nombre de la ubicación,
-                // confiando en los parámetros location y locationRadius para el filtro geográfico.
-                q: searchQuery || location 
+                key: this.apiKey
             };
 
-            // Solo usar ubicación si no es global
-            if (location !== 'global') {
-                params.location = `${locationCoords.lat},${locationCoords.lng}`;
-                params.locationRadius = locationCoords.radius;
+            // Lógica CORREGIDA para búsquedas
+            if (location === 'global') {
+                // Búsqueda global - solo el término de búsqueda
+                params.q = searchQuery || 'trending';
+            } else {
+                // Búsqueda por ubicación específica
+                const locationCoords = this.getLocationCoordinates(location);
+                
+                if (searchQuery) {
+                    // Búsqueda con término + ubicación como contexto
+                    params.q = searchQuery;
+                    // Agregar parámetros de ubicación para YouTube Data API
+                    params.location = `${locationCoords.lat},${locationCoords.lng}`;
+                    params.locationRadius = locationCoords.radius;
+                } else {
+                    // Solo ubicación - buscar contenido popular de esa área
+                    params.q = location;
+                    params.location = `${locationCoords.lat},${locationCoords.lng}`;
+                    params.locationRadius = locationCoords.radius;
+                }
             }
+
+            console.log('🔍 Parámetros de búsqueda:', params);
 
             const response = await axios.get(`${this.baseURL}/search`, { 
                 params,
@@ -73,6 +87,7 @@ class YouTubeController {
                 console.log(`✅ Encontrados ${response.data.items.length} videos reales`);
                 return this.formatVideos(response.data.items);
             } else {
+                console.log('📹 No se encontraron videos, usando datos de ejemplo');
                 return this.getMockVideos(location, searchQuery, maxResults);
             }
         } catch (error) {
@@ -101,7 +116,7 @@ class YouTubeController {
         const baseVideos = [
             {
                 id: 'tUrVwCBPUpY',
-                title: `OAXACA de Juárez en 4 días: guía de viaje completa 🇲🇽🫔🌽 - ${searchQuery || location}`,
+                title: `${location.toUpperCase()} - Guía completa de viaje ${searchQuery || 'turismo'}`,
                 description: `Descubre ${location} en 4 días | Guía completa de viaje ${location} es una de las joyas culturales y gastronómicas`,
                 channelTitle: `Turismo ${location}`,
                 publishedAt: new Date().toISOString(),
@@ -146,12 +161,10 @@ class YouTubeController {
         ];
 
         // Generar más videos si se necesitan
-        const videosToGenerate = maxResults - baseVideos.length;
-        for (let i = 0; i < videosToGenerate; i++) {
+        while (baseVideos.length < maxResults) {
             baseVideos.push({
-                ...baseVideos[i % baseVideos.length],
-                id: 'vid_' + Math.random().toString(36).substr(2, 9),
-                title: `Video Adicional ${i + 1} de ${location} - ${searchQuery || 'General'}`
+                ...baseVideos[baseVideos.length % baseVideos.length],
+                id: 'vid_' + Math.random().toString(36).substr(2, 9)
             });
         }
 
