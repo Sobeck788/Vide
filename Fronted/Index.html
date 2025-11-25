@@ -19,11 +19,10 @@
             
             <div class="location-user-section">
                 <div class="user-location" id="locationDisplay">
-                    Tu ubicación: <span id="currentLocation">Oaxaca</span>
-                    <button onclick="cambiarUbicacion()" class="location-change-btn">Cambiar</button>
+                    <span id="currentLocation">Oaxaca</span>
+                    <button onclick="cambiarUbicacion()" class="location-change-btn" style="padding: 2px 8px; font-size: 0.8rem; margin-left: 5px;">Cambiar Región</button>
                 </div>
                 
-                <!-- MENÚ DE USUARIO (Se muestra si estás logueado) -->
                 <div class="user-menu" id="userMenuContainer" style="display: none;">
                     <button class="user-button" id="userMenuButton">
                         <div class="user-authenticated">
@@ -37,25 +36,14 @@
                         <button class="dropdown-item" onclick="cerrarSesion()">Salir</button>
                     </div>
                 </div>
-                
-                <!-- BOTÓN DE LOGIN (Se muestra si NO estás logueado) -->
-                <div id="loginContainer">
-                    <button class="login-button" onclick="iniciarSesionGoogle()">Iniciar Sesión con Google</button>
+                <div id="loginContainer" style="display: block;">
+                    <button class="login-button" onclick="iniciarSesionGoogle()">Iniciar Sesión</button>
                 </div>
             </div>
         </header>
 
         <section class="filters">
-            <div class="sort-filter">
-                <select id="sortSelect" onchange="cambiarOrden()">
-                    <option value="relevance">Ordenar por: Relevancia</option>
-                    <option value="date">Fecha</option>
-                    <option value="viewCount">Vistas</option>
-                </select>
-            </div>
-            <div class="location-info" id="locationInfo">
-                Cargando videos para tu ubicación...
-            </div>
+            <div class="location-info" id="locationInfo">Cargando...</div>
         </section>
 
         <section class="video-list" id="videoList">
@@ -63,15 +51,11 @@
         </section>
     </div>
 
-    <!-- SDKs de Firebase -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
 
     <script>
-        // ===================================
-        // 1. CONFIGURACIÓN DE FIREBASE
-        // ===================================
         const firebaseConfig = {
           apiKey: "AIzaSyDYT4mQRUmZXhu1GwYJbcavtQYzr0eHeu0",
           authDomain: "videito-c89a2.firebaseapp.com",
@@ -81,162 +65,128 @@
           appId: "1:587797165631:web:3d9f16e83cf57497d46a8a",
           measurementId: "G-H837KE6W6K"
         };
-
-        // Inicializar
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
 
-        // ===================================
-        // 2. LÓGICA DE AUTENTICACIÓN
-        // ===================================
-
-        // Observador: Detecta si entras o sales
         auth.onAuthStateChanged((user) => {
             if (user) {
-                actualizarUIUsuario(user);
+                document.getElementById('userMenuContainer').style.display = 'block';
+                document.getElementById('loginContainer').style.display = 'none';
+                document.getElementById('userName').textContent = user.displayName;
+                document.getElementById('userAvatarHeader').style.backgroundImage = url(${user.photoURL});
+                guardarUsuarioEnDB(user);
             } else {
-                actualizarUIInvitado();
+                document.getElementById('userMenuContainer').style.display = 'none';
+                document.getElementById('loginContainer').style.display = 'block';
             }
         });
-
-        function actualizarUIUsuario(user) {
-            document.getElementById('userMenuContainer').style.display = 'block';
-            document.getElementById('loginContainer').style.display = 'none';
-            document.getElementById('userName').textContent = user.displayName;
-            document.getElementById('userAvatarHeader').style.backgroundImage = `url(${user.photoURL})`;
-        }
-
-        function actualizarUIInvitado() {
-            document.getElementById('userMenuContainer').style.display = 'none';
-            document.getElementById('loginContainer').style.display = 'block';
-        }
 
         function iniciarSesionGoogle() {
             const provider = new firebase.auth.GoogleAuthProvider();
-            auth.signInWithPopup(provider)
-                .then((result) => {
-                    console.log('Bienvenido:', result.user.displayName);
-                    guardarUsuarioEnDB(result.user);
-                }).catch((error) => {
-                    console.error('Error login:', error);
-                    alert('Error: ' + error.message);
-                });
+            auth.signInWithPopup(provider).catch(e => {
+                if(e.code === 'auth/unauthorized-domain') alert('Error: Dominio no autorizado en Firebase.');
+                else alert(e.message);
+            });
         }
 
         function guardarUsuarioEnDB(user) {
-            const userRef = db.collection('usuarios').doc(user.uid);
-            userRef.get().then((doc) => {
-                if (!doc.exists) {
-                    userRef.set({
-                        uid: user.uid,
-                        nombre: user.displayName,
-                        email: user.email,
-                        foto: user.photoURL,
-                        provider: 'google.com',
-                        creado: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                } else {
-                    userRef.update({ nombre: user.displayName, foto: user.photoURL });
-                }
-            });
+            db.collection('usuarios').doc(user.uid).set({
+                uid: user.uid, nombre: user.displayName, email: user.email, foto: user.photoURL,
+                ultimo_acceso: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
         }
+        function cerrarSesion() { if(confirm('¿Salir?')) auth.signOut().then(() => window.location.reload()); }
 
-        function cerrarSesion() {
-            if (confirm('¿Cerrar sesión?')) {
-                auth.signOut().then(() => window.location.reload());
-            }
-        }
+        // --- LÓGICA DE VIDEOS Y REGIÓN ---
+        let currentLocation = 'Oaxaca'; 
 
-        // ===================================
-        // 3. LÓGICA DE VIDEOS (Backend Local)
-        // ===================================
-        let currentLocation = 'Oaxaca';
-        let currentSearch = '';
-
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', () => {
             const urlParams = new URLSearchParams(window.location.search);
-            const searchParam = urlParams.get('search');
-            if (searchParam) {
-                document.getElementById('searchInput').value = searchParam;
-                currentSearch = searchParam;
-            }
-            cargarVideos(currentSearch);
             
-            // Evento Enter en buscador
-            document.getElementById('searchInput').addEventListener('keypress', function(e) {
+            // Recuperamos la ubicación de la URL
+            if (urlParams.get('location')) {
+                currentLocation = urlParams.get('location');
+            }
+            document.getElementById('currentLocation').textContent = currentLocation;
+
+            const searchParam = urlParams.get('search') || '';
+            if (searchParam) document.getElementById('searchInput').value = searchParam;
+            
+            cargarVideos(searchParam);
+
+            document.getElementById('searchInput').addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') buscarVideos();
             });
-
-            // Evento Menú Desplegable
-            const userMenuButton = document.getElementById('userMenuButton');
-            const dropdownMenu = document.getElementById('dropdownMenu');
-            if (userMenuButton) {
-                userMenuButton.addEventListener('click', () => dropdownMenu.classList.toggle('show'));
-            }
-            window.addEventListener('click', (e) => {
-                if (!e.target.closest('.user-button')) dropdownMenu.classList.remove('show');
+            
+            document.getElementById('userMenuButton').addEventListener('click', (e) => {
+                e.stopPropagation(); document.getElementById('dropdownMenu').classList.toggle('show');
             });
+            window.addEventListener('click', () => document.getElementById('dropdownMenu').classList.remove('show'));
         });
 
-        async function cargarVideos(searchQuery = '') {
-            try {
-                document.getElementById('videoList').innerHTML = '<div class="loading">Cargando...</div>';
-                const response = await fetch(`/api/videos?location=${currentLocation}&search=${encodeURIComponent(searchQuery)}`);
-                const data = await response.json();
+        async function cargarVideos(query) {
+            const videoList = document.getElementById('videoList');
+            videoList.innerHTML = '<div class="loading">Cargando...</div>';
+            document.getElementById('locationInfo').textContent = Buscando en ${currentLocation}...;
 
-                if (data.videos) { 
+            try {
+                const res = await fetch(/api/videos?location=${currentLocation}&search=${encodeURIComponent(query)});
+                if(!res.ok) throw new Error('Error Backend');
+                const data = await res.json();
+                
+                if(data.videos && data.videos.length > 0) {
                     mostrarVideos(data.videos);
-                    document.getElementById('locationInfo').textContent = 
-                        `Videos en ${currentLocation}${searchQuery ? ` - "${searchQuery}"` : ''}`;
+                    document.getElementById('locationInfo').textContent = Videos encontrados en ${currentLocation};
+                } else {
+                    throw new Error('Sin resultados');
                 }
-            } catch (error) {
-                console.error('Error:', error);
+            } catch (e) {
+                // MODO DEMO
+                console.warn("Usando Modo Demo:", e);
+                const mock = Array.from({length: 6}, (_,i) => ({
+                    id: demo_${i}_${Date.now()}, 
+                    title: Video Demo ${currentLocation} #${i+1}, 
+                    thumbnail: https://picsum.photos/300/200?random=${i}, 
+                    channelTitle: 'Demo Channel',
+                    publishedAt: new Date().toISOString()
+                }));
+                mostrarVideos(mock);
+                document.getElementById('locationInfo').innerHTML = 
+                    Modo Demo: ${currentLocation} <br><small>(Configura YOUTUBE_API_KEY en Render para ver videos reales)</small>;
             }
         }
 
         function mostrarVideos(videos) {
-            const videoList = document.getElementById('videoList');
-            if (videos.length === 0) {
-                videoList.innerHTML = '<div class="error">No hay videos aquí.</div>';
-                return;
-            }
-            videoList.innerHTML = videos.map(video => `
+            document.getElementById('videoList').innerHTML = videos.map(v => `
                 <div class="video-item">
-                    <div class="video-thumbnail" style="background-image: url('${video.thumbnail}')" onclick="reproducirVideo('${video.id}')">
+                    <div class="video-thumbnail" style="background-image: url('${v.thumbnail}')" onclick="reproducirVideo('${v.id}')">
                         <div class="play-overlay">▶</div>
                     </div>
                     <div class="video-info">
-                        <div class="video-title">${video.title}</div>
-                        <div class="video-channel">${video.channelTitle}</div>
-                        <div class="video-stats">${formatearFecha(video.publishedAt)}</div>
+                        <div class="video-title">${v.title}</div>
+                        <div class="video-channel">${v.channelTitle}</div>
                     </div>
-                </div>
-            `).join('');
+                </div>`).join('');
         }
 
         function reproducirVideo(videoId) {
-            window.location.href = `/reproduccion?v=${videoId}&location=${currentLocation}`;
+            window.location.href = /reproduccion?v=${videoId}&location=${currentLocation};
         }
 
         function buscarVideos() {
             const search = document.getElementById('searchInput').value.trim();
-            window.location.href = `/?search=${encodeURIComponent(search)}`;
+            // Aquí corregimos para NO perder la ubicación
+            window.location.href = /?search=${encodeURIComponent(search)}&location=${currentLocation};
         }
 
         function cambiarUbicacion() {
-            const nueva = prompt('Nueva ubicación:', currentLocation);
-            if (nueva) {
+            const nueva = prompt('Nueva ubicación (ej: Japon, España, Puebla):', currentLocation);
+            if(nueva) {
                 currentLocation = nueva;
-                document.getElementById('currentLocation').textContent = currentLocation;
-                cargarVideos(currentSearch);
+                // Recargamos limpio con la nueva ubicación
+                window.location.href = /?location=${nueva}; 
             }
-        }
-
-        function cambiarOrden() { alert('Próximamente'); }
-        
-        function formatearFecha(fecha) {
-            return new Date(fecha).toLocaleDateString('es-MX');
         }
     </script>
 </body>
