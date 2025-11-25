@@ -20,7 +20,7 @@
             <div class="location-user-section">
                 <div class="user-location" id="locationDisplay">
                     <span id="currentLocation">Oaxaca</span>
-                    <button onclick="cambiarUbicacion()" class="location-change-btn" style="padding: 2px 8px; font-size: 0.8rem; margin-left: 5px;">Cambiar Región</button>
+                    <button onclick="cambiarUbicacion()" class="location-change-btn" style="padding: 2px 8px; font-size: 0.8rem; margin-left: 5px;">Cambiar</button>
                 </div>
                 
                 <div class="user-menu" id="userMenuContainer" style="display: none;">
@@ -69,13 +69,16 @@
         const auth = firebase.auth();
         const db = firebase.firestore();
 
+        // AUTH
         auth.onAuthStateChanged((user) => {
             if (user) {
                 document.getElementById('userMenuContainer').style.display = 'block';
                 document.getElementById('loginContainer').style.display = 'none';
                 document.getElementById('userName').textContent = user.displayName;
                 document.getElementById('userAvatarHeader').style.backgroundImage = url(${user.photoURL});
-                guardarUsuarioEnDB(user);
+                db.collection('usuarios').doc(user.uid).set({
+                    uid: user.uid, nombre: user.displayName, email: user.email, foto: user.photoURL
+                }, { merge: true });
             } else {
                 document.getElementById('userMenuContainer').style.display = 'none';
                 document.getElementById('loginContainer').style.display = 'block';
@@ -84,27 +87,17 @@
 
         function iniciarSesionGoogle() {
             const provider = new firebase.auth.GoogleAuthProvider();
-            auth.signInWithPopup(provider).catch(e => {
-                if(e.code === 'auth/unauthorized-domain') alert('Error: Dominio no autorizado en Firebase.');
-                else alert(e.message);
-            });
+            auth.signInWithPopup(provider).catch(e => alert(e.message));
         }
+        function cerrarSesion() { auth.signOut().then(() => window.location.reload()); }
 
-        function guardarUsuarioEnDB(user) {
-            db.collection('usuarios').doc(user.uid).set({
-                uid: user.uid, nombre: user.displayName, email: user.email, foto: user.photoURL,
-                ultimo_acceso: firebase.firestore.FieldValue.serverTimestamp()
-            }, { merge: true });
-        }
-        function cerrarSesion() { if(confirm('¿Salir?')) auth.signOut().then(() => window.location.reload()); }
-
-        // --- LÓGICA DE VIDEOS Y REGIÓN ---
+        // LÓGICA DE VIDEOS
         let currentLocation = 'Oaxaca'; 
 
         document.addEventListener('DOMContentLoaded', () => {
             const urlParams = new URLSearchParams(window.location.search);
             
-            // Recuperamos la ubicación de la URL
+            // 1. LEER UBICACIÓN DE URL (Esto evita que regrese a Oaxaca)
             if (urlParams.get('location')) {
                 currentLocation = urlParams.get('location');
             }
@@ -135,25 +128,15 @@
                 if(!res.ok) throw new Error('Error Backend');
                 const data = await res.json();
                 
-                if(data.videos && data.videos.length > 0) {
-                    mostrarVideos(data.videos);
-                    document.getElementById('locationInfo').textContent = Videos encontrados en ${currentLocation};
+                if(data && data.length > 0) { // El backend devuelve un array directo
+                    mostrarVideos(data);
+                    document.getElementById('locationInfo').textContent = Resultados en ${currentLocation};
                 } else {
                     throw new Error('Sin resultados');
                 }
             } catch (e) {
-                // MODO DEMO
-                console.warn("Usando Modo Demo:", e);
-                const mock = Array.from({length: 6}, (_,i) => ({
-                    id: demo_${i}_${Date.now()}, 
-                    title: Video Demo ${currentLocation} #${i+1}, 
-                    thumbnail: https://picsum.photos/300/200?random=${i}, 
-                    channelTitle: 'Demo Channel',
-                    publishedAt: new Date().toISOString()
-                }));
-                mostrarVideos(mock);
-                document.getElementById('locationInfo').innerHTML = 
-                    Modo Demo: ${currentLocation} <br><small>(Configura YOUTUBE_API_KEY en Render para ver videos reales)</small>;
+                console.warn("Error:", e);
+                document.getElementById('videoList').innerHTML = '<div class="error">No se encontraron videos o falta API Key.</div>';
             }
         }
 
@@ -174,17 +157,15 @@
             window.location.href = /reproduccion?v=${videoId}&location=${currentLocation};
         }
 
+        // 2. CORRECCIÓN DE BÚSQUEDA: INCLUIR LOCATION
         function buscarVideos() {
             const search = document.getElementById('searchInput').value.trim();
-            // Aquí corregimos para NO perder la ubicación
             window.location.href = /?search=${encodeURIComponent(search)}&location=${currentLocation};
         }
 
         function cambiarUbicacion() {
             const nueva = prompt('Nueva ubicación (ej: Japon, España, Puebla):', currentLocation);
             if(nueva) {
-                currentLocation = nueva;
-                // Recargamos limpio con la nueva ubicación
                 window.location.href = /?location=${nueva}; 
             }
         }
