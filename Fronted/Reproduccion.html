@@ -126,14 +126,16 @@
             try {
                 const res = await fetch(/api/video-info?v=${id});
                 const data = await res.json();
-                if (data.success) {
-                    currentVideoInfo = data.video;
-                    mostrarDetalles(data.video);
-                    // 🔥 GUARDAR HISTORIAL INMEDIATAMENTE
-                    guardarEnHistorial(data.video); 
+                // Ajuste: Mi backend nuevo devuelve data directo o {video: ...}
+                const info = data.video || data; 
+                
+                if (info && info.title) {
+                    currentVideoInfo = info;
+                    mostrarDetalles(info);
+                    guardarEnHistorial(info); 
                 } else { throw new Error("No data"); }
             } catch(e) {
-                const demo = { id: id, title: "Video Demo / No Info", channelTitle: "Demo", description: "Error al cargar datos.", thumbnail: https://picsum.photos/seed/${id}/300/200 };
+                const demo = { id: id, title: "Video Demo", channelTitle: "Demo", description: "Datos no disponibles.", thumbnail: https://picsum.photos/seed/${id}/300/200 };
                 mostrarDetalles(demo);
                 guardarEnHistorial(demo);
             }
@@ -157,8 +159,10 @@
             try {
                 const res = await fetch(/api/videos?location=${loc});
                 const data = await res.json();
-                if(data.videos) {
-                    document.getElementById('suggestionsList').innerHTML = data.videos.map(v => `
+                // Ajuste: Si es array directo o objeto
+                const list = data.videos || data; 
+                if(list && list.length) {
+                    document.getElementById('suggestionsList').innerHTML = list.map(v => `
                         <div class="suggestion-item" onclick="window.location.href='/reproduccion?v=${v.id}&location=${loc}'">
                             <div class="suggestion-thumbnail" style="background-image: url('${v.thumbnail}')"></div>
                             <div class="suggestion-info"><div>${v.title}</div></div>
@@ -168,7 +172,6 @@
         }
 
         function buscarVideos() { 
-            // Mantenemos ubicación
             window.location.href = /?search=${document.getElementById('searchInput').value}&location=${currentLocation}; 
         }
         
