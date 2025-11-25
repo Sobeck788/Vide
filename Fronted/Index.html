@@ -4,249 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VideITO - Inicio</title>
-    <!-- Incluir Tailwind CSS para una estética moderna y responsiva -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        /* Estilos personalizados para el look de VideITO */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f7f7f7;
-            min-height: 100vh;
-        }
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 0 1rem;
-        }
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem 0;
-            border-bottom: 1px solid #e0e0e0;
-            margin-bottom: 1rem;
-        }
-        .logo {
-            font-size: 1.8rem;
-            font-weight: 800;
-            color: #ff0000; /* Color distintivo de YouTube/VideITO */
-            text-decoration: none;
-            margin-right: 2rem;
-        }
-        .search-bar {
-            display: flex;
-            border: 2px solid #ccc;
-            border-radius: 9999px; /* Fully rounded corners */
-            overflow: hidden;
-            width: 400px;
-            max-width: 100%;
-        }
-        .search-bar input {
-            padding: 0.5rem 1rem;
-            flex-grow: 1;
-            border: none;
-            outline: none;
-        }
-        .search-button {
-            background-color: #e0e0e0;
-            color: #333;
-            padding: 0.5rem 1rem;
-            border: none;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        .search-button:hover {
-            background-color: #ccc;
-        }
-        .user-location {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.9rem;
-            color: #555;
-        }
-        .location-change-btn, .login-button {
-            padding: 0.4rem 0.8rem;
-            border-radius: 9999px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background-color 0.3s;
-            border: 1px solid #ff0000;
-        }
-        .location-change-btn {
-            background-color: #fff;
-            color: #ff0000;
-        }
-        .location-change-btn:hover {
-            background-color: #fcebeb;
-        }
-        .login-button {
-            background-color: #ff0000;
-            color: white;
-            border: 1px solid #ff0000;
-        }
-        .login-button:hover {
-            background-color: #cc0000;
-        }
-
-        .video-list {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 1.5rem;
-            margin-top: 2rem;
-        }
-
-        .video-item {
-            background-color: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
-            transition: transform 0.2s;
-            cursor: pointer;
-        }
-        .video-item:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 10px rgba(0, 0, 0, 0.15);
-        }
-
-        .video-thumbnail {
-            position: relative;
-            width: 100%;
-            height: 0;
-            padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
-            background-size: cover;
-            background-position: center;
-            border-top-left-radius: 12px;
-            border-top-right-radius: 12px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        .play-overlay {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            background-color: rgba(0, 0, 0, 0.7);
-            border-radius: 50%;
-            width: 60px;
-            height: 60px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 2rem;
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-        .video-thumbnail:hover .play-overlay {
-            opacity: 1;
-        }
-
-        .video-info {
-            padding: 1rem;
-        }
-        .video-title {
-            font-weight: 600;
-            font-size: 1.1rem;
-            margin-bottom: 0.25rem;
-            height: 3.3em; /* Limita a dos líneas */
-            overflow: hidden;
-            line-height: 1.6;
-        }
-        .video-channel, .video-stats {
-            font-size: 0.85rem;
-            color: #666;
-        }
-
-        /* Utilidades de Header */
-        .logo-section { display: flex; align-items: center; }
-        .location-user-section { display: flex; align-items: center; gap: 1.5rem; }
-        .filters {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0.5rem 0;
-            border-bottom: 1px solid #e0e0e0;
-        }
-        .location-info {
-            font-size: 1.1rem;
-            font-weight: 600;
-        }
-        .loading, .error {
-            grid-column: 1 / -1;
-            text-align: center;
-            padding: 2rem;
-            font-size: 1.2rem;
-            color: #666;
-        }
-
-        /* Menú Dropdown */
-        .user-menu {
-            position: relative;
-        }
-        .user-button {
-            background: none;
-            border: none;
-            cursor: pointer;
-            padding: 0;
-        }
-        .user-authenticated {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        .user-avatar {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            background-color: #ccc;
-            background-size: cover;
-            background-position: center;
-        }
-        .dropdown-menu {
-            position: absolute;
-            top: 100%;
-            right: 0;
-            background-color: white;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            min-width: 150px;
-            z-index: 10;
-            margin-top: 0.5rem;
-            display: none;
-            opacity: 0;
-            transform: translateY(-10px);
-            transition: opacity 0.2s, transform 0.2s;
-        }
-        .dropdown-menu.show {
-            display: block;
-            opacity: 1;
-            transform: translateY(0);
-        }
-        .dropdown-item {
-            display: block;
-            padding: 0.5rem 1rem;
-            text-decoration: none;
-            color: #333;
-            background: none;
-            border: none;
-            width: 100%;
-            text-align: left;
-            cursor: pointer;
-        }
-        .dropdown-item:hover {
-            background-color: #f0f0f0;
-        }
-        .dropdown-divider {
-            height: 1px;
-            background-color: #eee;
-            margin: 0.25rem 0;
-        }
-    </style>
+    <link rel="stylesheet" href="Stilos.css">
 </head>
 <body>
     <div class="container">
@@ -306,7 +64,6 @@
     </div>
 
     <!-- SDKs de Firebase -->
-    <!-- Se usaron versiones CDN específicas para compatibilidad con el entorno -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
@@ -332,7 +89,6 @@
 
         // ===================================
         // 2. LÓGICA DE AUTENTICACIÓN
-        // (Sin cambios, para mantener funcionalidad)
         // ===================================
 
         // Observador: Detecta si entras o sales
@@ -358,14 +114,13 @@
 
         function iniciarSesionGoogle() {
             const provider = new firebase.auth.GoogleAuthProvider();
-            // Reemplazando alert/confirm con un mensaje en la consola, ya que alert no funciona bien en iframes.
             auth.signInWithPopup(provider)
                 .then((result) => {
                     console.log('Bienvenido:', result.user.displayName);
                     guardarUsuarioEnDB(result.user);
                 }).catch((error) => {
                     console.error('Error login:', error);
-                    document.getElementById('locationInfo').textContent = 'Error de inicio de sesión. Revisa la consola.';
+                    alert('Error: ' + error.message);
                 });
         }
 
@@ -388,35 +143,39 @@
         }
 
         function cerrarSesion() {
-            // Reemplazado window.confirm con un mensaje en consola
-            console.log('Cerrando sesión...');
-            auth.signOut().then(() => window.location.reload()).catch(e => console.error("Error al cerrar sesión", e));
+            if (confirm('¿Cerrar sesión?')) {
+                auth.signOut().then(() => window.location.reload());
+            }
         }
 
         // ===================================
-        // 3. LÓGICA DE VIDEOS (Backend Local)
+        // 3. LÓGICA DE VIDEOS Y REGIÓN (CORREGIDA)
         // ===================================
-        let currentLocation = 'Oaxaca';
+        let currentLocation = localStorage.getItem('currentLocation') || 'oaxaca';
         let currentSearch = '';
 
         document.addEventListener('DOMContentLoaded', function() {
-            const urlParams = new URLSearchParams(window.location.search);
+            // Cargar región guardada
+            document.getElementById('currentLocation').textContent = currentLocation;
             
-            // FIX 1: Obtener la ubicación de la URL, si está presente, para persistirla.
+            const urlParams = new URLSearchParams(window.location.search);
+            const searchParam = urlParams.get('search');
             const locationParam = urlParams.get('location');
+            
+            // Actualizar región si viene por parámetro
             if (locationParam) {
                 currentLocation = locationParam;
+                localStorage.setItem('currentLocation', currentLocation);
+                document.getElementById('currentLocation').textContent = currentLocation;
             }
-
-            const searchParam = urlParams.get('search');
+            
             if (searchParam) {
                 document.getElementById('searchInput').value = searchParam;
                 currentSearch = searchParam;
             }
             
-            document.getElementById('currentLocation').textContent = currentLocation;
-
             cargarVideos(currentSearch);
+            cargarComentarios();
             
             // Evento Enter en buscador
             document.getElementById('searchInput').addEventListener('keypress', function(e) {
@@ -427,45 +186,54 @@
             const userMenuButton = document.getElementById('userMenuButton');
             const dropdownMenu = document.getElementById('dropdownMenu');
             if (userMenuButton) {
-                userMenuButton.addEventListener('click', (e) => {
-                    e.stopPropagation(); // Previene que el evento se propague y cierre inmediatamente
-                    dropdownMenu.classList.toggle('show');
-                });
+                userMenuButton.addEventListener('click', () => dropdownMenu.classList.toggle('show'));
             }
             window.addEventListener('click', (e) => {
-                if (dropdownMenu && !e.target.closest('.user-menu')) {
-                    dropdownMenu.classList.remove('show');
-                }
+                if (!e.target.closest('.user-button')) dropdownMenu.classList.remove('show');
             });
         });
 
         async function cargarVideos(searchQuery = '') {
             try {
                 document.getElementById('videoList').innerHTML = '<div class="loading">Cargando...</div>';
-                // La URL de carga usa la currentLocation actualizada (por URL o por cambiarUbicacion)
-                const response = await fetch(`/api/videos?location=${encodeURIComponent(currentLocation)}&search=${encodeURIComponent(searchQuery)}`);
+                
+                // Obtener sessionId del usuario actual - CORREGIDO
+                const user = auth.currentUser;
+                const sessionId = user ? user.uid : 'anonymous';
+                
+                console.log('📍 Enviando búsqueda con región:', currentLocation, 'sessionId:', sessionId);
+                
+                const response = await fetch(`/api/videos?location=${currentLocation}&search=${encodeURIComponent(searchQuery)}&sessionId=${sessionId}`);
                 const data = await response.json();
 
                 if (data.videos) { 
                     mostrarVideos(data.videos);
                     document.getElementById('locationInfo').textContent = 
                         `Videos en ${currentLocation}${searchQuery ? ` - "${searchQuery}"` : ''}`;
+                        
+                    // Actualizar región actual si el backend la cambió
+                    if (data.currentRegion && data.currentRegion !== currentLocation) {
+                        currentLocation = data.currentRegion;
+                        localStorage.setItem('currentLocation', currentLocation);
+                        document.getElementById('currentLocation').textContent = currentLocation;
+                        console.log('🔄 Región actualizada a:', currentLocation);
+                    }
                 }
             } catch (error) {
-                console.error('Error al cargar videos:', error);
-                document.getElementById('videoList').innerHTML = '<div class="error">Error al cargar videos. Revisa la consola.</div>';
+                console.error('Error:', error);
+                document.getElementById('videoList').innerHTML = '<div class="error">Error al cargar videos</div>';
             }
         }
 
         function mostrarVideos(videos) {
             const videoList = document.getElementById('videoList');
             if (videos.length === 0) {
-                videoList.innerHTML = '<div class="error">No se encontraron videos para esta búsqueda y ubicación.</div>';
+                videoList.innerHTML = '<div class="error">No hay videos aquí.</div>';
                 return;
             }
             videoList.innerHTML = videos.map(video => `
-                <div class="video-item" onclick="reproducirVideo('${video.id}')">
-                    <div class="video-thumbnail" style="background-image: url('${video.thumbnail}')">
+                <div class="video-item">
+                    <div class="video-thumbnail" style="background-image: url('${video.thumbnail}')" onclick="reproducirVideo('${video.id}')">
                         <div class="play-overlay">▶</div>
                     </div>
                     <div class="video-info">
@@ -478,33 +246,178 @@
         }
 
         function reproducirVideo(videoId) {
-            // Asegura que la ubicación se pase al reproductor
-            window.location.href = `/reproduccion?v=${videoId}&location=${encodeURIComponent(currentLocation)}`;
+            // Guardar en historial local inmediatamente
+            const videoElement = document.querySelector(`[onclick="reproducirVideo('${videoId}')"]`);
+            if (videoElement) {
+                const title = videoElement.querySelector('.video-title').textContent;
+                const channel = videoElement.querySelector('.video-channel').textContent;
+                const thumbnail = videoElement.querySelector('.video-thumbnail').style.backgroundImage.slice(5, -2);
+                
+                guardarEnHistorialLocal({
+                    id: videoId,
+                    title: title,
+                    channelTitle: channel,
+                    thumbnail: thumbnail
+                });
+            }
+            
+            window.location.href = `/reproduccion?v=${videoId}&location=${currentLocation}`;
         }
 
         function buscarVideos() {
             const search = document.getElementById('searchInput').value.trim();
-            currentSearch = search;
-            // FIX 2: Al buscar, incluir tanto el término de búsqueda como la ubicación actual.
-            window.location.href = `/?search=${encodeURIComponent(search)}&location=${encodeURIComponent(currentLocation)}`;
-        }
-
-        function cambiarUbicacion() {
-            // Usar una ventana modal o un campo de texto en lugar de prompt() es mejor,
-            // pero para ser funcional se mantiene prompt.
-            const nueva = prompt('Ingresa la nueva ubicación (Ej: Puebla, Guadalajara, China):', currentLocation);
-            if (nueva && nueva.trim() !== '') {
-                currentLocation = nueva.trim();
-                document.getElementById('currentLocation').textContent = currentLocation;
-                // Redirigir para actualizar la URL y persistir la ubicación
-                window.location.href = `/?search=${encodeURIComponent(currentSearch)}&location=${encodeURIComponent(currentLocation)}`;
+            // Mantener la región actual en la búsqueda - CORREGIDO
+            if (search) {
+                window.location.href = `/?search=${encodeURIComponent(search)}&location=${currentLocation}`;
+            } else {
+                window.location.href = `/?location=${currentLocation}`;
             }
         }
 
-        function cambiarOrden() { console.log('Próximamente: Ordenar videos.'); }
+        function cambiarUbicacion() {
+            const ubicaciones = [
+                'oaxaca', 'ciudad de mexico', 'cdmx', 'mexico city', 
+                'guadalajara', 'monterrey', 'puebla', 'china', 
+                'estados unidos', 'usa', 'españa', 'japón', 'argentina', 'brasil', 'global'
+            ];
+            
+            const nueva = prompt(`Nueva ubicación:\n${ubicaciones.join(', ')}`, currentLocation);
+            if (nueva && ubicaciones.includes(nueva.toLowerCase())) {
+                currentLocation = nueva.toLowerCase();
+                localStorage.setItem('currentLocation', currentLocation);
+                document.getElementById('currentLocation').textContent = currentLocation;
+                cargarVideos(currentSearch);
+                console.log('📍 Región cambiada a:', currentLocation);
+            } else if (nueva) {
+                alert('Ubicación no válida. Usa una de: ' + ubicaciones.join(', '));
+            }
+        }
+
+        // ===================================
+        // 4. SISTEMA DE COMENTARIOS
+        // ===================================
+        async function cargarComentarios() {
+            try {
+                const response = await fetch('/api/comments');
+                const data = await response.json();
+                
+                if (data.success && data.comments) {
+                    mostrarComentarios(data.comments);
+                }
+            } catch (error) {
+                console.error('Error cargando comentarios:', error);
+            }
+        }
+
+        function mostrarComentarios(comentarios) {
+            // Crear sección de comentarios si no existe
+            let comentariosSection = document.getElementById('comentariosSection');
+            if (!comentariosSection) {
+                comentariosSection = document.createElement('section');
+                comentariosSection.id = 'comentariosSection';
+                comentariosSection.className = 'comentarios-section';
+                comentariosSection.innerHTML = `
+                    <h3>Comentarios sobre la Página</h3>
+                    <div class="comentario-form">
+                        <input type="text" id="nombreComentario" placeholder="Tu nombre" maxlength="50">
+                        <textarea id="textoComentario" placeholder="Comparte tus comentarios, sugerencias o reporta errores..." maxlength="500"></textarea>
+                        <button onclick="agregarComentario()">Enviar Comentario</button>
+                    </div>
+                    <div class="lista-comentarios" id="listaComentarios"></div>
+                `;
+                document.querySelector('.container').appendChild(comentariosSection);
+            }
+
+            const lista = document.getElementById('listaComentarios');
+            if (comentarios.length === 0) {
+                lista.innerHTML = '<p class="no-comments">No hay comentarios aún. ¡Sé el primero en comentar!</p>';
+            } else {
+                lista.innerHTML = comentarios.map(comentario => `
+                    <div class="comentario-item">
+                        <div class="comentario-header">
+                            <strong>${comentario.name}</strong>
+                            <span class="comentario-fecha">${formatearFecha(comentario.timestamp)}</span>
+                        </div>
+                        <div class="comentario-texto">${comentario.comment}</div>
+                    </div>
+                `).join('');
+            }
+        }
+
+        async function agregarComentario() {
+            const nombre = document.getElementById('nombreComentario').value.trim();
+            const comentario = document.getElementById('textoComentario').value.trim();
+            
+            if (!nombre || !comentario) {
+                alert('Por favor ingresa tu nombre y un comentario');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/comments', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        name: nombre,
+                        comment: comentario
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('nombreComentario').value = '';
+                    document.getElementById('textoComentario').value = '';
+                    cargarComentarios();
+                } else {
+                    alert('Error al enviar comentario: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error al enviar comentario');
+            }
+        }
+
+        // ===================================
+        // 5. HISTORIAL LOCAL (como fallback)
+        // ===================================
+        function guardarEnHistorialLocal(videoInfo) {
+            if (!auth.currentUser) return;
+            
+            try {
+                let historial = JSON.parse(localStorage.getItem('historialVideos') || '[]');
+                
+                historial = historial.filter(item => item.id !== videoInfo.id);
+                
+                historial.unshift({
+                    ...videoInfo,
+                    watchedAt: new Date().toISOString()
+                });
+                
+                historial = historial.slice(0, 50);
+                
+                localStorage.setItem('historialVideos', JSON.stringify(historial));
+            } catch (error) {
+                console.error('Error guardando historial local:', error);
+            }
+        }
+
+        function cambiarOrden() { 
+            alert('Ordenamiento - Próximamente'); 
+        }
         
         function formatearFecha(fecha) {
-            return new Date(fecha).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' });
+            try {
+                return new Date(fecha).toLocaleDateString('es-MX', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                });
+            } catch {
+                return 'Fecha no disponible';
+            }
         }
     </script>
 </body>
