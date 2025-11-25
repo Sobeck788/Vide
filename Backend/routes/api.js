@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
 
+// Almacenamiento en memoria (en producción usarías una base de datos)
+let userSessions = {};
+let pageComments = [];
+
 // Ruta de prueba del API
 router.get('/test', (req, res) => {
     res.json({ 
@@ -10,18 +14,49 @@ router.get('/test', (req, res) => {
     });
 });
 
-// Ruta para buscar videos por ubicación
+// Middleware para manejar sesiones simples
+const getSession = (req) => {
+    const sessionId = req.query.sessionId || 'default';
+    if (!userSessions[sessionId]) {
+        userSessions[sessionId] = {
+            currentRegion: 'oaxaca',
+            searchHistory: [],
+            watchHistory: []
+        };
+    }
+    return { sessionId, session: userSessions[sessionId] };
+};
+
+// Ruta para buscar videos por ubicación - CORREGIDA
 router.get('/videos', async (req, res) => {
     try {
-        const { location = 'Oaxaca', search = '', maxResults = 10 } = req.query;
-        console.log(`🔍 Solicitando videos: ubicación=${location}, búsqueda=${search}`);
+        const { session } = getSession(req);
+        let { location = session.currentRegion, search = '', maxResults = 10 } = req.query;
+        
+        // Actualizar región en sesión
+        if (location && location !== session.currentRegion) {
+            session.currentRegion = location;
+        }
+        
+        console.log(`🔍 Solicitando videos: ubicación=${location}, búsqueda=${search}, región actual=${session.currentRegion}`);
         
         const youtubeController = require('../controllers/youtubeController');
         const videos = await youtubeController.searchVideos(location, search, parseInt(maxResults));
 
+        // Guardar en historial de búsquedas si hay término de búsqueda
+        if (search) {
+            session.searchHistory.unshift({
+                query: search,
+                location: location,
+                timestamp: new Date().toISOString()
+            });
+            // Mantener solo las últimas 10 búsquedas
+            session.searchHistory = session.searchHistory.slice(0, 10);
+        }
+
         res.json({
             success: true,
-            location: location,
+            currentRegion: session.currentRegion,
             searchQuery: search,
             videos: videos,
             count: videos.length
@@ -38,7 +73,7 @@ router.get('/videos', async (req, res) => {
 // Ruta para obtener información de un video específico
 router.get('/video-info', async (req, res) => {
     try {
-        const { v: videoId } = req.query;
+        const { v: videoId, sessionId } = req.query;
         
         if (!videoId) {
             return res.status(400).json({
@@ -51,6 +86,19 @@ router.get('/video-info', async (req, res) => {
         const youtubeController = require('../controllers/youtubeController');
         const videos = await youtubeController.searchVideos('global', '', 1);
         const video = videos[0] || {};
+
+        // Agregar al historial de visualización
+        if (sessionId && userSessions[sessionId]) {
+            userSessions[sessionId].watchHistory.unshift({
+                id: videoId,
+                title: video.title || 'Video de YouTube',
+                channel: video.channelTitle || 'Canal de YouTube',
+                watchedAt: new Date().toISOString(),
+                thumbnail: video.thumbnail || ''
+            });
+            // Mantener solo los últimos 20 videos vistos
+            userSessions[sessionId].watchHistory = userSessions[sessionId].watchHistory.slice(0, 20);
+        }
 
         res.json({
             success: true,
@@ -75,29 +123,65 @@ router.get('/video-info', async (req, res) => {
     }
 });
 
-// Ruta para obtener historial (simulado)
+// Ruta para obtener historial ACTUALIZADA
 router.get('/history', (req, res) => {
-    const mockHistory = {
-        searches: ['Dios nunca muere', 'Oaxaca música', 'Guelaguetza', 'Gastronomía oaxaqueña'],
-        videos: [
-            {
-                id: 'dQw4w9WgXcQ',
-                title: 'The Phantom of the Opera Directo desde el Macedonio Alcalá',
-                channel: 'The Shows Must Go On!',
-                watchedAt: new Date().toISOString(),
-                thumbnail: 'https://via.placeholder.com/320x180/ff6b6b/white?text=Teatro+Oaxaca'
-            },
-            {
-                id: 'dQw4w9WgXcR', 
-                title: 'Banda de Música - Guelaguetza 2023',
-                channel: 'Cultura Oaxaca',
-                watchedAt: new Date(Date.now() - 86400000).toISOString(),
-                thumbnail: 'https://via.placeholder.com/320x180/4ecdc4/white?text=Guelaguetza'
-            }
-        ]
-    };
+    const { session } = getSession(req);
+    
+    res.json({
+        searches: session.searchHistory || [],
+        videos: session.watchHistory || []
+    });
+});
 
-    res.json(mockHistory);
+// Ruta para comentarios de la página
+router.get('/comments', (req, res) => {
+    res.json({
+        success: true,
+        comments: pageComments
+    });
+});
+
+router.post('/comments', (req, res) => {
+    try {
+        const { name, comment } = req.body;
+        
+        if (!name || !comment) {
+            return res.status(400).json({
+                success: false,
+                error: 'Nombre y comentario son requeridos'
+            });
+        }
+
+        const newComment = {
+            id: Date.now().toString(),
+            name: name,
+            comment: comment,
+            timestamp: new Date().toISOString(),
+            likes: 0
+        };
+
+        pageComments.unshift(newComment);
+        
+        res.json({
+            success: true,
+            comment: newComment
+        });
+    } catch (error) {
+        console.error('Error en /comments:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// Ruta para obtener región actual
+router.get('/current-region', (req, res) => {
+    const { session } = getSession(req);
+    res.json({
+        success: true,
+        region: session.currentRegion
+    });
 });
 
 module.exports = router;
