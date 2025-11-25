@@ -23,7 +23,6 @@
                     <button onclick="cambiarUbicacion()" class="location-change-btn">Cambiar</button>
                 </div>
                 
-                <!-- MENÚ DE USUARIO -->
                 <div class="user-menu" id="userMenuContainer" style="display: none;">
                     <button class="user-button" id="userMenuButton">
                         <div class="user-authenticated">
@@ -37,25 +36,14 @@
                         <button class="dropdown-item" onclick="cerrarSesion()">Salir</button>
                     </div>
                 </div>
-                
-                <!-- BOTÓN DE LOGIN -->
-                <div id="loginContainer">
-                    <button class="login-button" onclick="iniciarSesionGoogle()">Iniciar Sesión con Google</button>
+                <div id="loginContainer" style="display: block;">
+                    <button class="login-button" onclick="iniciarSesionGoogle()">Iniciar Sesión</button>
                 </div>
             </div>
         </header>
 
         <section class="filters">
-            <div class="sort-filter">
-                <select id="sortSelect" onchange="cambiarOrden()">
-                    <option value="relevance">Ordenar por: Relevancia</option>
-                    <option value="date">Fecha</option>
-                    <option value="viewCount">Vistas</option>
-                </select>
-            </div>
-            <div class="location-info" id="locationInfo">
-                Cargando videos para tu ubicación...
-            </div>
+            <div class="location-info" id="locationInfo">Cargando...</div>
         </section>
 
         <section class="video-list" id="videoList">
@@ -63,13 +51,11 @@
         </section>
     </div>
 
-    <!-- SDKs de Firebase -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
 
     <script>
-        // TU CONFIGURACIÓN EXACTA
         const firebaseConfig = {
           apiKey: "AIzaSyDYT4mQRUmZXhu1GwYJbcavtQYzr0eHeu0",
           authDomain: "videito-c89a2.firebaseapp.com",
@@ -79,54 +65,34 @@
           appId: "1:587797165631:web:3d9f16e83cf57497d46a8a",
           measurementId: "G-H837KE6W6K"
         };
-
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
 
-        // 2. LÓGICA DE AUTENTICACIÓN
         auth.onAuthStateChanged((user) => {
             if (user) {
-                actualizarUIUsuario(user);
-                guardarUsuarioEnDB(user); // Aseguramos que se guarde al recargar
+                document.getElementById('userMenuContainer').style.display = 'block';
+                document.getElementById('loginContainer').style.display = 'none';
+                document.getElementById('userName').textContent = user.displayName;
+                document.getElementById('userAvatarHeader').style.backgroundImage = url(${user.photoURL});
+                guardarUsuarioEnDB(user);
             } else {
-                actualizarUIInvitado();
+                document.getElementById('userMenuContainer').style.display = 'none';
+                document.getElementById('loginContainer').style.display = 'block';
             }
         });
 
-        function actualizarUIUsuario(user) {
-            document.getElementById('userMenuContainer').style.display = 'block';
-            document.getElementById('loginContainer').style.display = 'none';
-            document.getElementById('userName').textContent = user.displayName;
-            document.getElementById('userAvatarHeader').style.backgroundImage = url(${user.photoURL});
-        }
-
-        function actualizarUIInvitado() {
-            document.getElementById('userMenuContainer').style.display = 'none';
-            document.getElementById('loginContainer').style.display = 'block';
-        }
-
         function iniciarSesionGoogle() {
             const provider = new firebase.auth.GoogleAuthProvider();
-            auth.signInWithPopup(provider).catch((error) => alert('Error: ' + error.message));
+            auth.signInWithPopup(provider).catch(e => alert(e.message));
         }
 
         function guardarUsuarioEnDB(user) {
-            const userRef = db.collection('usuarios').doc(user.uid);
-            userRef.set({
-                uid: user.uid,
-                nombre: user.displayName,
-                email: user.email,
-                foto: user.photoURL,
-                ultimo_acceso: firebase.firestore.FieldValue.serverTimestamp()
+            db.collection('usuarios').doc(user.uid).set({
+                uid: user.uid, nombre: user.displayName, email: user.email, foto: user.photoURL
             }, { merge: true });
         }
-
-        function cerrarSesion() {
-            if (confirm('¿Cerrar sesión?')) {
-                auth.signOut().then(() => window.location.reload());
-            }
-        }
+        function cerrarSesion() { if(confirm('¿Cerrar sesión?')) auth.signOut().then(() => window.location.reload()); }
 
         // 3. LÓGICA DE VIDEOS
         let currentLocation = 'Oaxaca';
@@ -135,7 +101,6 @@
         document.addEventListener('DOMContentLoaded', function() {
             const urlParams = new URLSearchParams(window.location.search);
             
-            // RECUPERAR UBICACIÓN DE LA URL (¡Para que no se olvide!)
             if (urlParams.get('location')) {
                 currentLocation = urlParams.get('location');
             }
@@ -152,38 +117,44 @@
                 if (e.key === 'Enter') buscarVideos();
             });
 
-            const userMenuButton = document.getElementById('userMenuButton');
-            const dropdownMenu = document.getElementById('dropdownMenu');
-            if (userMenuButton) {
-                userMenuButton.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    dropdownMenu.classList.toggle('show');
-                });
-            }
-            window.addEventListener('click', () => dropdownMenu.classList.remove('show'));
+            document.getElementById('userMenuButton').addEventListener('click', (e) => {
+                e.stopPropagation(); document.getElementById('dropdownMenu').classList.toggle('show');
+            });
+            window.addEventListener('click', () => document.getElementById('dropdownMenu').classList.remove('show'));
         });
 
         async function cargarVideos(searchQuery = '') {
             const videoList = document.getElementById('videoList');
-            videoList.innerHTML = '<div class="loading">Cargando videos...</div>';
+            videoList.innerHTML = '<div class="loading">Buscando videos...</div>';
+            document.getElementById('locationInfo').textContent = Buscando en ${currentLocation}...;
             
             try {
                 const response = await fetch(/api/videos?location=${currentLocation}&search=${encodeURIComponent(searchQuery)});
+                
+                if (!response.ok) throw new Error('Error de conexión con el servidor');
+                
                 const data = await response.json();
+                console.log("Datos recibidos:", data); // Para depurar
 
-                // El backend puede devolver array directo o objeto {videos: []}
-                const videos = Array.isArray(data) ? data : data.videos;
+                // 🔥 EL ARREGLO MAESTRO 🔥
+                // Aceptamos los datos si vienen como { videos: [...] } O como [...]
+                const videos = Array.isArray(data) ? data : (data.videos || []);
 
-                if (videos && videos.length > 0) { 
+                if (videos.length > 0) { 
                     mostrarVideos(videos);
                     document.getElementById('locationInfo').textContent = 
-                        Videos en ${currentLocation}${searchQuery ? ` - "${searchQuery}" : ''}`;
+                        Videos encontrados en ${currentLocation};
                 } else {
                     videoList.innerHTML = '<div class="error">No se encontraron videos.</div>';
                 }
             } catch (error) {
                 console.warn('Error cargando videos:', error);
-                videoList.innerHTML = '<div class="error">Error de conexión o API Key faltante en Render.</div>';
+                // Si falla, mostramos Mocks desde el frontend como último recurso
+                const mocks = Array.from({length:6}, (_,i)=>({
+                    id: fallback_${i}, title: Video Demo Frontend ${i}, thumbnail: https://picsum.photos/300/200?r=${i}, channelTitle: 'Demo'
+                }));
+                mostrarVideos(mocks);
+                document.getElementById('locationInfo').textContent = 'Modo Demo (Fallo de conexión)';
             }
         }
 
@@ -197,33 +168,27 @@
                     <div class="video-info">
                         <div class="video-title">${video.title}</div>
                         <div class="video-channel">${video.channelTitle}</div>
-                        <div class="video-stats">${formatearFecha(video.publishedAt)}</div>
+                        <div class="video-stats">Visto recientemente</div>
                     </div>
                 </div>
             `).join('');
         }
 
         function reproducirVideo(videoId) {
-            // PASAMOS LA UBICACIÓN para no perderla
             window.location.href = /reproduccion?v=${videoId}&location=${currentLocation};
         }
 
         function buscarVideos() {
             const search = document.getElementById('searchInput').value.trim();
-            // PASAMOS LA UBICACIÓN AQUÍ TAMBIÉN
             window.location.href = /?search=${encodeURIComponent(search)}&location=${currentLocation};
         }
 
         function cambiarUbicacion() {
-            const nueva = prompt('Nueva ubicación (ej: Japon, España):', currentLocation);
+            const nueva = prompt('Nueva ubicación:', currentLocation);
             if (nueva) {
-                // Recargamos limpio con la nueva ubicación
                 window.location.href = /?location=${nueva};
             }
         }
-
-        function cambiarOrden() { alert('Próximamente'); }
-        function formatearFecha(fecha) { return new Date(fecha).toLocaleDateString('es-MX'); }
     </script>
 </body>
 </html>
