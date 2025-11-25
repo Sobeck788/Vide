@@ -246,23 +246,24 @@
         }
 
         function reproducirVideo(videoId) {
-            // Guardar en historial local inmediatamente
-            const videoElement = document.querySelector(`[onclick="reproducirVideo('${videoId}')"]`);
-            if (videoElement) {
-                const title = videoElement.querySelector('.video-title').textContent;
-                const channel = videoElement.querySelector('.video-channel').textContent;
-                const thumbnail = videoElement.querySelector('.video-thumbnail').style.backgroundImage.slice(5, -2);
-                
-                guardarEnHistorialLocal({
-                    id: videoId,
-                    title: title,
-                    channelTitle: channel,
-                    thumbnail: thumbnail
-                });
-            }
-            
-            window.location.href = `/reproduccion?v=${videoId}&location=${currentLocation}`;
-        }
+    // Guardar en historial local inmediatamente
+    const videoElement = document.querySelector(`[onclick="reproducirVideo('${videoId}')"]`);
+    if (videoElement) {
+        const title = videoElement.querySelector('.video-title').textContent;
+        const channel = videoElement.querySelector('.video-channel').textContent;
+        const thumbnail = videoElement.querySelector('.video-thumbnail').style.backgroundImage.slice(5, -2);
+        
+        guardarEnHistorialLocal({
+            id: videoId,
+            title: title,
+            channelTitle: channel,
+            thumbnail: thumbnail
+        });
+    }
+    
+    // Redirigir a página de reproducción - TODOS los videos
+    window.location.href = `/reproduccion?v=${videoId}&location=${currentLocation}`;
+}
 
         function buscarVideos() {
             const search = document.getElementById('searchInput').value.trim();
