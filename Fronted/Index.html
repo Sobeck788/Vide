@@ -374,38 +374,41 @@
         // ===================================
         async function guardarEnHistorialLocal(videoInfo) {
     const user = auth.currentUser;
-    if (!user) {
-        console.log('⚠️ Usuario no logueado, no se guarda en historial');
-        return;
-    }
     
     try {
         console.log('💾 Guardando en historial:', videoInfo.title);
         
-        // Preparar datos para Firestore
+        // Preparar datos
         const historialData = {
-            videoId: videoInfo.id,
+            id: videoInfo.id,
             title: videoInfo.title || 'Video sin título',
             channelTitle: videoInfo.channelTitle || 'Canal desconocido',
             thumbnail: videoInfo.thumbnail || `https://via.placeholder.com/320x180/ff6b6b/white?text=Video`,
-            vistoPorUltimaVez: firebase.firestore.FieldValue.serverTimestamp(),
-            duration: videoInfo.duration || '0:00',
+            watchedAt: new Date().toISOString(),
             viewCount: videoInfo.viewCount || '0'
         };
 
-        // Guardar en Firestore
-        await db.collection('usuarios').doc(user.uid).collection('historial').doc(videoInfo.id).set(historialData);
-        console.log('✅ Guardado en Firestore:', videoInfo.title);
+        // INTENTAR guardar en Firestore (si hay conexión)
+        if (user) {
+            try {
+                await db.collection('usuarios').doc(user.uid).collection('historial').doc(videoInfo.id).set({
+                    ...historialData,
+                    vistoPorUltimaVez: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                console.log('✅ Guardado en Firestore');
+            } catch (firestoreError) {
+                console.log('⚠️ No se pudo guardar en Firestore, usando localStorage:', firestoreError);
+            }
+        }
 
-        // También guardar en localStorage
+        // SIEMPRE guardar en localStorage
         let historialLocal = JSON.parse(localStorage.getItem('historialVideos') || '[]');
         historialLocal = historialLocal.filter(item => item.id !== videoInfo.id);
-        historialLocal.unshift({
-            ...historialData,
-            watchedAt: new Date().toISOString()
-        });
+        historialLocal.unshift(historialData);
         historialLocal = historialLocal.slice(0, 50);
         localStorage.setItem('historialVideos', JSON.stringify(historialLocal));
+        
+        console.log('✅ Guardado en localStorage');
         
     } catch (error) {
         console.error('❌ Error guardando historial:', error);
