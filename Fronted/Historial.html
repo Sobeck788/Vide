@@ -28,26 +28,13 @@
             margin-bottom: 20px;
             border: 1px solid #333;
         }
-        .clear-history {
-            background: #ff6b6b;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 12px;
-            margin-left: 15px;
-        }
-        .clear-history:hover {
-            background: #ff5252;
-        }
-        .debug-info {
+        .storage-info {
             background: #2a2a2a;
-            padding: 10px;
+            padding: 8px 12px;
             border-radius: 5px;
-            margin: 10px 0;
+            margin: 5px 0;
             font-size: 12px;
-            color: #888;
+            color: #4ecdc4;
         }
     </style>
 </head>
@@ -82,13 +69,8 @@
             <h1 class="page-title">Historial de Reproducción</h1>
             
             <div class="history-stats" id="historyStats">
-                <span id="statsText">Cargando estadísticas...</span>
-                <button class="clear-history" onclick="limpiarHistorial()" id="clearHistoryBtn" style="display: none;">Limpiar Historial</button>
-            </div>
-
-            <!-- Información de debug -->
-            <div class="debug-info" id="debugInfo" style="display: none;">
-                Información de debug aparecerá aquí...
+                <span id="statsText">Cargando historial...</span>
+                <div class="storage-info" id="storageInfo"></div>
             </div>
 
             <section class="video-list" id="historialContainer">
@@ -97,100 +79,66 @@
         </main>
     </div>
 
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
-
     <script>
-        const firebaseConfig = {
-          apiKey: "AIzaSyDYT4mQRUmZXhu1GwYJbcavtQYzr0eHeu0",
-          authDomain: "videito-c89a2.firebaseapp.com",
-          projectId: "videito-c89a2",
-          storageBucket: "videito-c89a2.firebasestorage.app",
-          messagingSenderId: "587797165631",
-          appId: "1:587797165631:web:3d9f16e83cf57497d46a8a",
-          measurementId: "G-H837KE6W6K"
-        };
-
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
-
+        // No necesitamos Firebase para el historial local
         let currentUser = null;
 
-        auth.onAuthStateChanged((user) => {
-            currentUser = user;
-            if (user) {
+        // Simular autenticación básica
+        function checkAuth() {
+            const userData = localStorage.getItem('userData');
+            if (userData) {
+                const user = JSON.parse(userData);
+                currentUser = user;
                 document.getElementById('userMenuContainer').style.display = 'block';
                 document.getElementById('loginContainer').style.display = 'none';
                 document.getElementById('userName').textContent = user.displayName;
-                document.getElementById('userAvatarHeader').style.backgroundImage = `url(${user.photoURL})`;
-                document.getElementById('clearHistoryBtn').style.display = 'inline-block';
-                
-                cargarHistorial(user.uid);
+                if (user.photoURL) {
+                    document.getElementById('userAvatarHeader').style.backgroundImage = `url(${user.photoURL})`;
+                }
             } else {
                 document.getElementById('userMenuContainer').style.display = 'none';
                 document.getElementById('loginContainer').style.display = 'block';
-                document.getElementById('historialContainer').innerHTML = 
-                    '<div class="no-data">Inicia sesión para ver tu historial.</div>';
-                document.getElementById('statsText').textContent = 'Inicia sesión para ver tu historial';
-                document.getElementById('clearHistoryBtn').style.display = 'none';
             }
-        });
+        }
 
         function iniciarSesionGoogle() {
-            const provider = new firebase.auth.GoogleAuthProvider();
-            auth.signInWithPopup(provider).catch(error => {
-                alert('Error: ' + error.message);
-            });
+            // Simulación simple de login para demostración
+            const userData = {
+                uid: 'demo-user',
+                displayName: 'Usuario Demo',
+                email: 'demo@videito.com'
+            };
+            localStorage.setItem('userData', JSON.stringify(userData));
+            checkAuth();
+            cargarHistorial();
         }
 
         function cerrarSesion() {
             if (confirm('¿Cerrar sesión?')) {
-                auth.signOut().then(() => window.location.href = '/');
+                localStorage.removeItem('userData');
+                currentUser = null;
+                window.location.href = '/';
             }
         }
 
-        async function cargarHistorial(uid) {
+        function cargarHistorial() {
             const container = document.getElementById('historialContainer');
             const statsText = document.getElementById('statsText');
-            const debugInfo = document.getElementById('debugInfo');
+            const storageInfo = document.getElementById('storageInfo');
 
             container.innerHTML = '<div class="loading">Cargando historial...</div>';
             statsText.textContent = 'Cargando...';
-            debugInfo.style.display = 'block';
-            debugInfo.innerHTML = '🔍 Iniciando carga de historial...';
 
             try {
-                console.log('📚 Cargando historial para usuario:', uid);
-                debugInfo.innerHTML += '<br>🔍 Usuario: ' + uid;
+                console.log('📚 Cargando historial desde localStorage...');
+                
+                // Cargar desde localStorage
+                const historialLocal = JSON.parse(localStorage.getItem('historialVideos') || '[]');
+                
+                storageInfo.textContent = `💾 Almacenamiento local: ${historialLocal.length} videos`;
+                console.log('✅ Videos en localStorage:', historialLocal.length);
 
-                // PRIMERO: Verificar si el documento de usuario existe
-                const userDoc = await db.collection('usuarios').doc(uid).get();
-                debugInfo.innerHTML += '<br>📄 Documento de usuario existe: ' + userDoc.exists;
-
-                if (!userDoc.exists) {
-                    debugInfo.innerHTML += '<br>⚠️ El documento de usuario no existe en Firestore';
-                    container.innerHTML = `
-                        <div class="no-data">
-                            <div>📺 No hay historial disponible</div>
-                            <div style="color: #888; margin-top: 10px;">Ve algunos videos para que aparezcan aquí</div>
-                        </div>
-                    `;
-                    statsText.textContent = 'No hay historial disponible';
-                    return;
-                }
-
-                // SEGUNDO: Obtener el historial
-                const snapshot = await db.collection('usuarios').doc(uid)
-                                         .collection('historial')
-                                         .orderBy('vistoPorUltimaVez', 'desc')
-                                         .get();
-
-                debugInfo.innerHTML += '<br>✅ Documentos encontrados: ' + snapshot.size;
-
-                if (snapshot.empty) {
-                    debugInfo.innerHTML += '<br>📭 La colección de historial está vacía';
+                if (historialLocal.length === 0) {
                     container.innerHTML = `
                         <div class="no-data">
                             <div style="font-size: 48px; margin-bottom: 15px;">📺</div>
@@ -204,19 +152,13 @@
                 }
 
                 let html = '';
-                let count = 0;
                 
-                snapshot.forEach(doc => {
-                    const video = doc.data();
-                    count++;
-                    
-                    debugInfo.innerHTML += `<br>🎬 Video ${count}: ${video.title}`;
-
+                historialLocal.forEach((video, index) => {
                     // Formatear fecha
                     let fecha = 'Recientemente';
-                    if (video.vistoPorUltimaVez) {
+                    if (video.watchedAt) {
                         try {
-                            const fechaObj = video.vistoPorUltimaVez.toDate();
+                            const fechaObj = new Date(video.watchedAt);
                             fecha = fechaObj.toLocaleDateString('es-MX', {
                                 year: 'numeric',
                                 month: 'short', 
@@ -230,7 +172,7 @@
                     }
 
                     html += `
-                        <div class="video-item" onclick="irAVideo('${video.videoId}')">
+                        <div class="video-item" onclick="irAVideo('${video.id}')">
                             <div class="video-thumbnail" style="background-image: url('${video.thumbnail || 'https://via.placeholder.com/320x180/333/white?text=Sin+miniatura'}')">
                                 <div class="play-overlay">▶</div>
                             </div>
@@ -238,55 +180,41 @@
                                 <div class="video-title">${video.title || 'Video sin título'}</div>
                                 <div class="video-channel">${video.channelTitle || 'Canal desconocido'}</div>
                                 <div class="video-stats">Visto: ${fecha}</div>
+                                ${video.viewCount ? `<div class="video-stats">${video.viewCount} vistas</div>` : ''}
                             </div>
                         </div>
                     `;
                 });
 
                 container.innerHTML = html;
-                statsText.textContent = `${count} video${count !== 1 ? 's' : ''} en tu historial`;
-                debugInfo.innerHTML += `<br>✅ Historial cargado: ${count} videos`;
+                statsText.textContent = `${historialLocal.length} video${historialLocal.length !== 1 ? 's' : ''} en tu historial`;
                 
+                console.log('✅ Historial cargado correctamente desde localStorage');
+
             } catch (error) {
                 console.error('❌ Error cargando historial:', error);
-                debugInfo.innerHTML += `<br>❌ Error: ${error.message}`;
                 container.innerHTML = `
                     <div class="no-data">
                         <div style="color: #ff6b6b; font-size: 48px; margin-bottom: 15px;">⚠️</div>
                         <div style="font-size: 18px; margin-bottom: 10px;">Error al cargar el historial</div>
                         <div style="color: #888; margin-bottom: 20px;">${error.message}</div>
-                        <button onclick="cargarHistorial('${uid}')" style="background: #ff6b6b; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">Reintentar</button>
+                        <button onclick="cargarHistorial()" style="background: #ff6b6b; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">Reintentar</button>
                     </div>
                 `;
                 statsText.textContent = 'Error cargando historial';
+                storageInfo.textContent = '❌ Error accediendo al almacenamiento local';
             }
         }
 
-        async function limpiarHistorial() {
-            if (!currentUser) return;
-
+        function limpiarHistorial() {
             if (!confirm('¿Estás seguro de que quieres limpiar todo tu historial? Esta acción no se puede deshacer.')) {
                 return;
             }
 
             try {
-                const container = document.getElementById('historialContainer');
-                container.innerHTML = '<div class="loading">Limpiando historial...</div>';
-
-                const snapshot = await db.collection('usuarios').doc(currentUser.uid)
-                                         .collection('historial')
-                                         .get();
-
-                const batch = db.batch();
-                snapshot.forEach(doc => {
-                    batch.delete(doc.ref);
-                });
-
-                await batch.commit();
-                
+                localStorage.removeItem('historialVideos');
                 alert('Historial limpiado correctamente');
-                cargarHistorial(currentUser.uid);
-                
+                cargarHistorial();
             } catch (error) {
                 alert('Error al limpiar el historial: ' + error.message);
             }
@@ -296,8 +224,12 @@
             window.location.href = `/reproduccion?v=${videoId}`;
         }
 
-        // Menú desplegable
+        // Inicializar
         document.addEventListener('DOMContentLoaded', function() {
+            checkAuth();
+            cargarHistorial();
+
+            // Menú desplegable
             const userMenuButton = document.getElementById('userMenuButton');
             const dropdownMenu = document.getElementById('dropdownMenu');
             
