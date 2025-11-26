@@ -246,11 +246,11 @@
         }
 
         function reproducirVideo(videoId) {
-    console.log('🎬 Click en video:', videoId);
-    alert('Intentando reproducir: ' + videoId); // ← AGREGA ESTA LÍNEA
+    console.log('🎬 Redirigiendo a video:', videoId);
     
-    // Redirigir a página de reproducción
-    window.location.href = `/reproduccion?v=${videoId}&location=${currentLocation}`;
+    // SOLUCIÓN: Usar window.location.assign() en lugar de .href
+    window.location.assign(`/reproduccion?v=${videoId}&location=${currentLocation}`);
+    
 }
 
         function buscarVideos() {
