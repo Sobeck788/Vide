@@ -246,11 +246,44 @@
         }
 
         function reproducirVideo(videoId) {
-    console.log('🎬 Redirigiendo a video:', videoId);
+    console.log('🎬 Click en video:', videoId);
     
-    // SOLUCIÓN: Usar window.location.assign() en lugar de .href
-    window.location.assign(`/reproduccion?v=${videoId}&location=${currentLocation}`);
+    // BUSCAR la información del video en la lista actual
+    const videoItems = document.querySelectorAll('.video-item');
+    let videoInfo = {
+        id: videoId,
+        title: 'Video',
+        channelTitle: 'Canal',
+        thumbnail: ''
+    };
     
+    // Intentar encontrar el video en la lista actual
+    videoItems.forEach(item => {
+        const titleElement = item.querySelector('.video-title');
+        const channelElement = item.querySelector('.video-channel');
+        const thumbnailElement = item.querySelector('.video-thumbnail');
+        
+        if (titleElement && titleElement.textContent.includes(videoId.substring(0, 10)) || 
+            (thumbnailElement && thumbnailElement.style.backgroundImage.includes(videoId))) {
+            
+            videoInfo = {
+                id: videoId,
+                title: titleElement.textContent || 'Video',
+                channelTitle: channelElement.textContent || 'Canal',
+                thumbnail: thumbnailElement.style.backgroundImage.slice(5, -2) || ''
+            };
+        }
+    });
+    
+    console.log('📋 Información del video encontrada:', videoInfo);
+    
+    // GUARDAR INMEDIATAMENTE en el historial
+    guardarEnHistorialLocal(videoInfo);
+    
+    // Redirigir a reproducción
+    setTimeout(() => {
+        window.location.assign(`/reproduccion?v=${videoId}&location=${currentLocation}`);
+    }, 100);
 }
 
         function buscarVideos() {
@@ -373,14 +406,12 @@
         // 5. HISTORIAL LOCAL (como fallback)
         // ===================================
         async function guardarEnHistorialLocal(videoInfo) {
-    const user = auth.currentUser;
+    console.log('💾 Intentando guardar en historial:', videoInfo);
     
     try {
-        console.log('💾 Guardando en historial:', videoInfo.title);
-        
-        // Preparar datos
+        // Asegurarnos de que tenemos la información mínima
         const historialData = {
-            id: videoInfo.id,
+            id: videoInfo.id || 'unknown',
             title: videoInfo.title || 'Video sin título',
             channelTitle: videoInfo.channelTitle || 'Canal desconocido',
             thumbnail: videoInfo.thumbnail || `https://via.placeholder.com/320x180/ff6b6b/white?text=Video`,
@@ -388,30 +419,42 @@
             viewCount: videoInfo.viewCount || '0'
         };
 
-        // INTENTAR guardar en Firestore (si hay conexión)
+        console.log('📝 Datos a guardar:', historialData);
+
+        // GUARDAR EN LOCALSTORAGE (esto siempre funciona)
+        let historialLocal = JSON.parse(localStorage.getItem('historialVideos') || '[]');
+        
+        // Eliminar duplicados
+        historialLocal = historialLocal.filter(item => item.id !== historialData.id);
+        
+        // Agregar al inicio
+        historialLocal.unshift(historialData);
+        
+        // Mantener solo los últimos 50
+        historialLocal = historialLocal.slice(0, 50);
+        
+        // Guardar en localStorage
+        localStorage.setItem('historialVideos', JSON.stringify(historialLocal));
+        
+        console.log('✅ Guardado en localStorage. Total videos:', historialLocal.length);
+        console.log('🎬 Último video guardado:', historialData.title);
+
+        // Intentar guardar en Firestore también (si está disponible)
+        const user = auth.currentUser;
         if (user) {
             try {
-                await db.collection('usuarios').doc(user.uid).collection('historial').doc(videoInfo.id).set({
+                await db.collection('usuarios').doc(user.uid).collection('historial').doc(historialData.id).set({
                     ...historialData,
                     vistoPorUltimaVez: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                console.log('✅ Guardado en Firestore');
+                console.log('✅ También guardado en Firestore');
             } catch (firestoreError) {
-                console.log('⚠️ No se pudo guardar en Firestore, usando localStorage:', firestoreError);
+                console.log('⚠️ No se pudo guardar en Firestore:', firestoreError);
             }
         }
-
-        // SIEMPRE guardar en localStorage
-        let historialLocal = JSON.parse(localStorage.getItem('historialVideos') || '[]');
-        historialLocal = historialLocal.filter(item => item.id !== videoInfo.id);
-        historialLocal.unshift(historialData);
-        historialLocal = historialLocal.slice(0, 50);
-        localStorage.setItem('historialVideos', JSON.stringify(historialLocal));
-        
-        console.log('✅ Guardado en localStorage');
         
     } catch (error) {
-        console.error('❌ Error guardando historial:', error);
+        console.error('❌ Error crítico guardando historial:', error);
     }
 }
 
